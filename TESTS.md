@@ -6,8 +6,8 @@ Dernière exécution : 11 novembre 2026, par la CI GitHub Actions (`.github/work
 
 | Niveau | Commande | Environnement | Résultat |
 | --- | --- | --- | --- |
-| Unitaire JVM, module `:core` | `./gradlew :core:test` | Ubuntu 26.04, JDK 17, Gradle 9.6.0, Kotlin 2.4.10 | **83 tests réussis** : AccessTest 27, ArchiveTest 13, CryptoTest 15, DocsTest 21, StoreTest 7 |
-| Instrumenté, module `:app` | `./gradlew :app:connectedDemoDebugAndroidTest` | Émulateur Android 14 (API 34), x86-64 | **Tâche réussie** : KeystoreGateTest (7 tests) et VaultDbTest (4 tests) |
+| Unitaire JVM, module `:core` | `./gradlew :core:test` | Ubuntu 26.04, JDK 17, Gradle 9.6.0, Kotlin 2.4.10 | **89 tests réussis** : AccessTest 27, ArchiveTest 13, AttachmentTest 6, CryptoTest 15, DocsTest 21, StoreTest 7 |
+| Instrumenté, module `:app` | `./gradlew :app:connectedDemoDebugAndroidTest` | Émulateur Android 14 (API 34), x86-64 | **18 tests réussis** : KeystoreGateTest 7, VaultDbTest 4, AttachmentStoreTest 7 |
 | Lint | `./gradlew :app:lintProdRelease` | Idem | Réussi, sans erreur |
 | Compilation | `./gradlew :app:assembleDemoDebug :app:assembleProdRelease` | Idem | Réussie |
 | Contrôle de l'APK `prod` | `tools/check-apk.sh` | aapt2 des build-tools | Réussi |
@@ -45,7 +45,9 @@ Statuts : **exécuté et réussi**, **exécuté et en échec**, **non exécuté*
 | | Manuel (applications récentes, extinction d'écran, passage par l'application d'authentification) | **Non exécuté** | — | — |
 | **Fiche et pièces jointes** | Unitaire JVM | **Exécuté et réussi** pour les fiches | `DocsTest` : `fiche_aller_retour_avec_zeros_initiaux_…`, `fiche_chiffree_pour_la_base_…`, `recherche_insensible_…` | JVM 17 |
 | | Instrumenté | **Exécuté et réussi** pour les fiches | `VaultDbTest.ajout_modification_suppression_apres_reouverture_de_la_base` (RIB à zéros initiaux compris) | Émulateur, Android 14 |
-| | Pièces jointes, import annulé ou interrompu | **Non exécuté** | Non écrit | — |
+| | Unitaire JVM, pièces jointes | **Exécuté et réussi** | `AttachmentTest` : format vérifié par signature, taille limite, annulation, liaison à l'identifiant, métadonnées chiffrées | JVM 17 |
+| | Instrumenté, pièces jointes | **Exécuté et réussi** | `AttachmentStoreTest` : `import_relecture_et_rien_en_clair_sur_le_disque`, `import_refuse_ou_annule_ne_laisse_aucun_fichier` (annulation et verrouillage en cours d'import), `suppression_et_nettoyage_des_orphelins_au_demarrage`, `pdf_rendu_page_par_page_sans_copie_en_clair_restante`, `image_decodee_avec_dimensions_bornees`, `migration_de_la_base_version_1_vers_2_sans_perte` | Émulateur, Android 14 |
+| | Par l'interface : sélecteur de fichiers, appareil photo, PDF protégé par mot de passe | **Non exécuté** | — | — |
 | **Partage** | Tous | **Non exécuté** | Non écrit | — |
 | **Rappels** | Unitaire JVM | **Exécuté et réussi** pour le calcul | `DocsTest` : `etat_des_echeances`, `rappels_*` | JVM 17 |
 | | Notifications coffre verrouillé, replanification | **Non exécuté** | Non écrit | — |

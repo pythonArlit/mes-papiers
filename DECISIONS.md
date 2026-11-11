@@ -34,6 +34,7 @@ Chaque décision indique son état : **en place** (code écrit et testé sur JVM
 | activity-compose, core-ktx, lifecycle | 1.13.0, 1.18.0, 2.10.0 |
 | Room | 2.8.4 |
 | ZXing core (QR hors ligne) | 3.5.3 |
+| androidx.exifinterface (orientation des photos) | 1.3.7 |
 | Bouncy Castle `bcprov-jdk18on` | 1.78.1 |
 | JUnit, androidx.test runner, ext-junit | 4.13.2, 1.6.2, 1.2.1 |
 
@@ -97,7 +98,7 @@ Room stocke `(identifiant, blob chiffré)`. Titre, étiquettes, champs, catégor
 
 **D-13 — Identifiants.** *En place.* UUID aléatoires en minuscules, validés par expression régulière à chaque décodage : un identifiant venu d'une archive ne peut pas former un chemin.
 
-**D-14 — Appareil photo du système, pas de capture intégrée.** *Prévu.*
+**D-14 — Appareil photo du système, pas de capture intégrée.** *En place, non essayé par l'interface.*
 Pas de permission `CAMERA`, moins de code sensible. La photo est écrite par l'appareil photo dans un fichier privé exposé temporairement par `FileProvider`, puis chiffrée et effacée ; ce répertoire est vidé à chaque démarrage.
 
 **D-15 — Rappels par `AlarmManager` inexact, pas par WorkManager.** *Calcul en place, planification prévue.*
@@ -124,6 +125,12 @@ En-tête en clair (magie, version, paramètres de dérivation, contrôle de clé
 **D-22 — QR par ZXing.** *En place.* Génération locale, sans service distant ni permission.
 
 **D-23 — Navigation par état, sans bibliothèque de navigation.** *En place.* Une seule activité exportée ; l'écran affiché découle de l'état d'accès, donc tout lancement mène à la connexion tant que la session est verrouillée. L'état sauvegardé de l'activité est ignoré.
+
+**D-24 — Stockage des pièces jointes.** *En place, testé sur émulateur.* Un fichier chiffré par pièce dans `noBackupFilesDir/attachments`, nommé d'après un identifiant aléatoire ; métadonnées (nom d'origine compris) chiffrées dans Room. Ajout : fichier temporaire synchronisé, renommage, puis ligne en base. Suppression : ligne, puis fichier. Un arrêt brutal ne peut laisser qu'un fichier chiffré sans ligne, supprimé au démarrage suivant. Un verrouillage pendant un import l'annule.
+
+**D-25 — Validation après import.** *En place.* Une pièce n'est gardée que si elle s'ouvre réellement : image décodable, ou PDF que `PdfRenderer` accepte (un PDF protégé par mot de passe est refusé avec un message explicite).
+
+**D-26 — Visionneuse.** *En place.* Images décodées en mémoire avec un côté borné à 2 560 pixels et orientation EXIF appliquée. PDF rendu une page à la fois ; depuis la mémoire (`memfd`) sur Android 11 et suivants, par fichier temporaire privé avant.
 
 ## Points ouverts à valider sur appareil
 

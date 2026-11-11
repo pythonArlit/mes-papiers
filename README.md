@@ -2,7 +2,7 @@
 
 > **État au 11 novembre 2026 : ne pas utiliser avec des documents réels.**
 >
-> - L'application se compile et s'installe, mais elle est **incomplète** : pas de pièces jointes, pas de partage, pas de rappels, **pas de sauvegarde**. Sans sauvegarde, perdre le téléphone ou un facteur d'accès, c'est tout perdre.
+> - L'application se compile et s'installe, mais elle est **incomplète** : pas de partage, pas de rappels, **pas de sauvegarde**. Sans sauvegarde, perdre le téléphone ou un facteur d'accès, c'est tout perdre.
 > - La variante `demo` ne demande **pas** le code de l'application d'authentification (raccourci de démonstration) : elle n'a que la protection de la phrase secrète.
 > - L'interface n'a été vérifiée par aucun test ni sur aucun téléphone réel.
 > - Le chiffrement n'utilise pas Tink mais AES-256-GCM de la plateforme avec une construction en flux propre au projet, non relue par un tiers.
@@ -17,10 +17,10 @@ Application Android individuelle et hors connexion pour conserver et retrouver p
 | --- | --- | --- |
 | J0 Architecture, menaces, décisions | Fait | — |
 | J1 Accès et stockage chiffré | Fait et testé | Fait : configuration, connexion en deux étapes, verrouillage ; testé sur émulateur avec le vrai Keystore. Manquent les écrans de paramètres |
-| J2 Fiches et pièces jointes | Fait et testé | Fiches faites (Room chiffré, accueil, liste, détail, édition). **Pièces jointes à faire** |
+| J2 Fiches et pièces jointes | Fait et testé | Fait : fiches (Room chiffré, accueil, liste, détail, édition) et pièces jointes (import, photo, visionneuse image et PDF). Manquent les miniatures |
 | J3 Partage et échéances | Calcul fait et testé | État des échéances affiché. Partage et rappels à faire |
 | J4 Sauvegarde et restauration | Format fait et testé | À faire |
-| J5 Recette et revue MASVS | 83 tests JVM, contrôle par mutation | 11 tests instrumentés ; recette manuelle à faire |
+| J5 Recette et revue MASVS | 89 tests JVM, contrôle par mutation | 18 tests instrumentés ; recette manuelle à faire |
 
 Chaque poussée sur `main` déclenche la CI : tests du noyau, lint, APK `demo` et `prod`, contrôle de l'APK `prod`, tests sur émulateur. L'APK de démonstration est téléchargeable dans les artefacts de l'exécution (`apk-demo`).
 

@@ -9,7 +9,7 @@ Tout ce qui est incomplet, non vérifié ou différent du cahier des charges. **
 | Jalon | Fait | Manque |
 | --- | --- | --- |
 | J1 Accès | Configuration, connexion en deux étapes, QR d'enrôlement, délai progressif, verrouillage (écran éteint, arrière-plan, inactivité), avertissement sans verrouillage d'écran | Paramètres : changement de phrase et nouvel enrôlement TOTP (la logique existe dans le noyau, pas l'écran) ; réglage des durées de verrouillage |
-| J2 Fiches | Ajout, modification, favori, duplication, suppression confirmée, champs personnalisés, masquage des champs sensibles, accueil, liste filtrée, recherche | **Pièces jointes** (import, photo, visualisation, miniatures) ; sélecteur de date (saisie au format JJ/MM/AAAA pour l'instant) |
+| J2 Fiches et pièces | Fiches : ajout, modification, favori, duplication (avec ou sans pièces), suppression confirmée, champs personnalisés, masquage, accueil, liste, recherche. Pièces jointes : import par le sélecteur système, photo par l'appareil photo du système, limites, format vérifié par signature, annulation, stockage chiffré, visionneuse image et PDF, suppression indépendante, nettoyage au démarrage | Miniatures (les pièces sont listées par type, nom et taille) ; sélecteur de date (saisie au format JJ/MM/AAAA) |
 | J3 Partage et échéances | État des échéances affiché | Partage, presse-papiers, rappels et notifications |
 | J4 Sauvegarde | Format et lecture vérifiée dans le noyau | Écrans d'export et de restauration, phrase de récupération, rappel d'export |
 | J5 Recette | Tests JVM et instrumentés automatiques | Recette manuelle, accessibilité, captures d'écran |
@@ -42,7 +42,14 @@ Le bouton « Ouvrir dans mon application d'authentification », exigé par le ca
 **E-12 — Liste non paginée.**
 Les listes affichent au plus 100 fiches à la fois, avec invitation à préciser la recherche. Suffisant pour la volumétrie visée, mais ce n'est pas un vrai défilement paresseux.
 
-**E-13 — Migrations de base.** La base est en version 1 : il n'y a encore aucune migration à tester. Le schéma n'est pas exporté.
+**E-13 — Migrations de base.** La base est en version 2 ; la migration 1 → 2 (table des pièces jointes) est testée sur émulateur. Le schéma n'est pas exporté par Room : le test recrée la version 1 à la main.
+
+**E-14 — Pièces jointes : points non vérifiés.**
+- Le sélecteur de fichiers et l'appareil photo du système sont lancés par l'interface, que rien ne teste (E-08) : le parcours « choisir un fichier » et « prendre une photo » n'a jamais été exécuté de bout en bout.
+- Le refus d'un PDF protégé par mot de passe repose sur l'exception levée par `PdfRenderer` ; aucun test ne fournit un tel PDF.
+- Le rendu PDF depuis la mémoire est testé sur Android 14 ; le repli par fichier temporaire (Android 8 à 10) n'a pas été exécuté.
+- Une pièce est déchiffrée entièrement en mémoire pour être affichée (20 Mo au plus), ce qui peut être lourd sur un téléphone à 2 Go de RAM.
+- La photo de travail reste en clair dans le cache privé pendant la prise de vue ; elle est effacée après chiffrement, après annulation et au démarrage.
 
 ## Limites connues
 
@@ -61,7 +68,7 @@ Les listes affichent au plus 100 fiches à la fois, avec invitation à préciser
 
 ## Avant toute utilisation avec des documents réels
 
-1. Terminer E-02 (pièces jointes, partage, rappels, sauvegarde) : sans export, la perte du téléphone ou d'un facteur est définitive.
+1. Terminer E-02 (partage, rappels, sauvegarde) : sans export, la perte du téléphone ou d'un facteur est définitive.
 2. Lever E-03 (Tink ou relecture).
 3. Vérifier l'interface sur appareil (E-08) et mesurer Argon2id (E-05).
 4. Dérouler la recette manuelle : absence de sauvegarde et de transfert, notifications, restauration sur un second téléphone.
