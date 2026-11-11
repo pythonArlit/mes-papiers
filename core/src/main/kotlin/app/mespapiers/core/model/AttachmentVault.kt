@@ -36,6 +36,13 @@ object AttachmentVault {
         return meta
     }
 
+    /** Aperçu réduit d'une pièce (quelques dizaines de Ko), chiffré comme le reste. */
+    fun sealThumb(key: ByteArray, id: String, jpeg: ByteArray): ByteArray =
+        Aead.seal(key, jpeg, CryptoContext.of("attachment-thumb", id))
+
+    fun openThumb(key: ByteArray, id: String, blob: ByteArray): ByteArray =
+        Aead.open(key, blob, CryptoContext.of("attachment-thumb", id))
+
     fun encrypting(key: ByteArray, id: String, sink: OutputStream): OutputStream =
         StreamCipher.encryptingStream(key, CryptoContext.of("attachment-file", id), sink)
 

@@ -98,7 +98,36 @@
     <string name="home_deadlines_none">Aucune échéance proche.</string>
     <string name="home_favorites">Favoris</string>
     <string name="home_favorites_none">Aucun favori. Ouvre un document pour l’ajouter aux favoris.</string>
-    <string name="home_all">Tous les documents</string>
+    <plurals name="home_all">
+        <item quantity="one">Voir et rechercher le document</item>
+        <item quantity="many">Voir et rechercher les %1$d documents</item>
+        <item quantity="other">Voir et rechercher les %1$d documents</item>
+    </plurals>
+    <string name="stat_documents">Documents</string>
+    <string name="stat_favorites">Favoris</string>
+    <string name="stat_deadlines">Échéances</string>
+
+    <!-- Scan et lecture automatique -->
+    <string name="scan_action">Scanner un document</string>
+    <string name="scan_pitch">Prends le document en photo ou choisis un fichier : Mes Papiers le lit sur ton téléphone et prépare la fiche. Tu vérifies, tu corriges, tu enregistres.</string>
+    <string name="scan_manual">Saisir à la main, sans scanner</string>
+    <string name="scan_source_hint">Pose le document à plat, bien éclairé, et cadre-le entièrement.</string>
+    <string name="scan_from_file">Choisir une photo ou un PDF</string>
+    <string name="scan_reading">Lecture du document…</string>
+    <plurals name="scan_detected">
+        <item quantity="one">%1$d information a été lue sur le document. Vérifie-la avant d’enregistrer.</item>
+        <item quantity="many">%1$d informations ont été lues sur le document. Vérifie-les avant d’enregistrer : la lecture automatique peut se tromper.</item>
+        <item quantity="other">%1$d informations ont été lues sur le document. Vérifie-les avant d’enregistrer : la lecture automatique peut se tromper.</item>
+    </plurals>
+    <string name="scan_nothing">Le document est joint, mais rien n’a pu être lu automatiquement. Complète la fiche à la main.</string>
+    <string name="scan_field_detected">Lu sur le document, à vérifier</string>
+    <string name="field_birth_date">Date de naissance</string>
+    <string name="preview_open">Ouvrir : %1$s</string>
+    <string name="detail_more">Plus d’actions</string>
+    <string name="detail_information">Informations</string>
+    <string name="attach_photo_short">Photo</string>
+    <string name="attach_pick_short">Fichier</string>
+    <string name="viewer_zoom_hint">Écarte deux doigts pour agrandir.</string>
     <string name="home_lock">Verrouiller</string>
     <string name="home_unreadable_title">Documents illisibles</string>
     <plurals name="home_unreadable">

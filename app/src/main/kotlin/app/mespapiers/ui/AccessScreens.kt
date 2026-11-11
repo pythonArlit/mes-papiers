@@ -91,6 +91,13 @@ private val LightColors = lightColorScheme(
     onSurface = Color(0xFF14201F),
     surfaceVariant = Color(0xFFE1EBEB),
     onSurfaceVariant = Color(0xFF3B4A4A),
+    primaryContainer = Color(0xFFCFE8EC),
+    onPrimaryContainer = Color(0xFF06313B),
+    secondaryContainer = Color(0xFFD5F4E7),
+    onSecondaryContainer = Color(0xFF0B3B2B),
+    tertiary = Color(0xFF7A5900),
+    tertiaryContainer = Color(0xFFFFE9C2),
+    onTertiaryContainer = Color(0xFF3E2A00),
     error = Color(0xFFB3261E),
 )
 
@@ -104,6 +111,13 @@ private val DarkColors = darkColorScheme(
     onSurface = Color(0xFFE1EBEB),
     surfaceVariant = Color(0xFF22383C),
     onSurfaceVariant = Color(0xFFBCCBCB),
+    primaryContainer = Color(0xFF14505E),
+    onPrimaryContainer = Color(0xFFCFE8EC),
+    secondaryContainer = Color(0xFF1D4A3A),
+    onSecondaryContainer = Color(0xFFD5F4E7),
+    tertiary = Color(0xFFF1C04C),
+    tertiaryContainer = Color(0xFF5A4300),
+    onTertiaryContainer = Color(0xFFFFE9C2),
     error = Color(0xFFF2B8B5),
 )
 
@@ -129,27 +143,32 @@ fun AppRoot(vm: AccessViewModel, vault: VaultViewModel) {
                 },
             color = MaterialTheme.colorScheme.background,
         ) {
-            Column(Modifier.safeDrawingPadding().imePadding()) {
+            Column(Modifier.safeDrawingPadding()) {
                 if (Variant.IS_DEMO) DemoBanner()
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-                    Column(
-                        Modifier
-                            .widthIn(max = 560.dp)
-                            .fillMaxWidth()
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 20.dp, vertical = 24.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        if (vm.screen != Screen.Home) LaunchedEffect(Unit) { vault.reset() }
-                        when (val s = vm.screen) {
-                            Screen.Loading -> BusyRow()
-                            Screen.Intro -> IntroScreen(vm)
-                            Screen.CreatePassphrase -> CreatePassphraseScreen(vm)
-                            is Screen.Enroll -> EnrollScreen(vm, s)
-                            Screen.Passphrase -> PassphraseScreen(vm)
-                            Screen.Totp -> TotpScreen(vm)
-                            Screen.Home -> VaultRoot(vault, onLock = { vm.lock() })
-                            Screen.Unreadable -> UnreadableScreen()
+                if (vm.screen == Screen.Home) {
+                    VaultRoot(vault, onLock = { vm.lock() })
+                } else {
+                    // Dès que la session n'est plus ouverte, plus rien du coffre ne reste à l'écran.
+                    LaunchedEffect(Unit) { vault.reset() }
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                        Column(
+                            Modifier
+                                .widthIn(max = 560.dp)
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                                .padding(horizontal = 20.dp, vertical = 24.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                        ) {
+                            when (val s = vm.screen) {
+                                Screen.Loading -> BusyRow()
+                                Screen.Intro -> IntroScreen(vm)
+                                Screen.CreatePassphrase -> CreatePassphraseScreen(vm)
+                                is Screen.Enroll -> EnrollScreen(vm, s)
+                                Screen.Passphrase -> PassphraseScreen(vm)
+                                Screen.Totp -> TotpScreen(vm)
+                                Screen.Home -> Unit
+                                Screen.Unreadable -> UnreadableScreen()
+                            }
                         }
                     }
                 }

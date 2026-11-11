@@ -2,38 +2,50 @@ package app.mespapiers
 
 import android.app.Application
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
+import androidx.annotation.StringRes
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.content.FileProvider
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import app.mespapiers.core.docs.Deadlines
+import app.mespapiers.core.docs.DocumentReader
+import app.mespapiers.core.docs.Extraction
+import app.mespapiers.core.docs.FileSignature
 import app.mespapiers.core.model.AttachmentMeta
 import app.mespapiers.core.model.AttachmentRole
+import app.mespapiers.core.model.Category
+import app.mespapiers.core.model.Field
+import app.mespapiers.core.model.FieldType
 import app.mespapiers.core.model.FileFormat
+import app.mespapiers.core.model.Ids
 import app.mespapiers.core.model.ImportException
+import app.mespapiers.core.model.Limits
+import app.mespapiers.core.model.Record
+import app.mespapiers.core.model.Templates
 import app.mespapiers.core.util.wipe
 import app.mespapiers.data.NoSpaceException
 import app.mespapiers.platform.ImageRenderer
 import app.mespapiers.platform.PdfSession
-import kotlinx.coroutines.Job
-import java.io.File
-import java.io.IOException
-import androidx.annotation.StringRes
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.viewModelScope
-import app.mespapiers.core.docs.Deadlines
-import app.mespapiers.core.model.Category
-import app.mespapiers.core.model.Field
-import app.mespapiers.core.model.FieldType
-import app.mespapiers.core.model.Ids
-import app.mespapiers.core.model.Limits
-import app.mespapiers.core.model.Record
-import app.mespapiers.core.model.Templates
+import app.mespapiers.platform.TextReader
+import app.mespapiers.platform.Thumbnails
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.IOException
+import java.io.InputStream
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -85,18 +97,36 @@ class DraftField(
     label: String,
     value: String,
     sensitive: Boolean,
+    detected: Boolean = false,
 ) {
     var type by mutableStateOf(type)
     var label by mutableStateOf(label)
     var value by mutableStateOf(value)
     var sensitive by mutableStateOf(sensitive)
+
+    /** Vrai tant que la valeur est celle lue automatiquement sur le document. */
+    var detected by mutableStateOf(detected)
 }
 
 /** Fiche en cours de saisie. Vit dans le ViewModel, jamais dans un état sauvegardé. */
-class Draft(val id: String?, val category: Category, val createdAtMs: Long, val favorite: Boolean, title: String, tags: String) {
+class Draft(
+    val id: String,
+    val isNew: Boolean,
+    category: Category,
+    val createdAtMs: Long,
+    val favorite: Boolean,
+    title: String,
+    tags: String,
+    /** Ce qui a été lu sur le document scanné ; null pour une saisie à la main. */
+    val extraction: Extraction? = null,
+) {
+    var category by mutableStateOf(category)
     var title by mutableStateOf(title)
+    var titleDetected by mutableStateOf(false)
     var tags by mutableStateOf(tags)
     val fields = mutableStateListOf<DraftField>()
+
+    val detectedCount: Int get() = fields.count { it.detected } + if (titleDetected) 1 else 0
 }
 
 class VaultViewModel(app: Application) : AndroidViewModel(app) {
@@ -116,13 +146,23 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
     var error by mutableStateOf<Int?>(null)
         private set
 
-    private var detailCameFromList = false
-
     /** Octets importés pendant un import en cours, null sinon. */
     var importProgress by mutableStateOf<Long?>(null)
         private set
+
+    /** Vrai pendant la lecture automatique d'un document. */
+    var scanning by mutableStateOf(false)
+        private set
     var viewer by mutableStateOf<ViewerState>(ViewerState.Loading)
         private set
+
+    /** Aperçus déchiffrés, en mémoire pendant la session seulement. */
+    val thumbs = mutableStateMapOf<String, ImageBitmap>()
+    private val thumbsRequested = HashSet<String>()
+    private val thumbDispatcher = Dispatchers.IO.limitedParallelism(2)
+
+    private var detailCameFromList = false
+    private var viewerReturn: VaultScreen = VaultScreen.Home
     private var importJob: Job? = null
 
     @Volatile
@@ -132,7 +172,9 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
 
     fun today(): LocalDate = Deadlines.today(c.clock.wallMillis(), ZoneId.systemDefault())
 
-    private fun categoryLabel(r: Record): String = getApplication<Application>().getString(categoryLabelRes(r.category))
+    private fun string(@StringRes res: Int) = getApplication<Application>().getString(res)
+
+    private fun categoryLabel(r: Record): String = string(categoryLabelRes(r.category))
 
     /** Retour à l'état initial, appelé dès que la session n'est plus ouverte. */
     fun reset() {
@@ -145,14 +187,20 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
         closeViewer()
         captureFile?.delete()
         captureFile = null
+        thumbs.clear()
+        synchronized(thumbsRequested) { thumbsRequested.clear() }
     }
 
     fun load() {
         if (state.loaded || busy) return
         io {
             val loaded = c.vault.loadAll()
+            val ids = loaded.records.map { it.id }.toSet()
+            // Pièces d'une fiche jamais enregistrée (scan abandonné, verrouillage en cours de saisie).
+            val (kept, orphans) = c.attachments.loadAll().partition { it.recordId in ids }
+            orphans.forEach { c.attachments.delete(it) }
             state.set(loaded.records, loaded.unreadable, ::categoryLabel)
-            state.attachments = c.attachments.loadAll()
+            state.attachments = kept
         }
     }
 
@@ -171,20 +219,36 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
 
     fun back() {
         error = null
-        screen = when (val s = screen) {
-            VaultScreen.Home -> VaultScreen.Home
-            VaultScreen.List, VaultScreen.PickCategory -> VaultScreen.Home
-            is VaultScreen.Detail -> if (detailCameFromList) VaultScreen.List else VaultScreen.Home
+        when (screen) {
+            VaultScreen.Home -> Unit
+            VaultScreen.List, VaultScreen.PickCategory -> screen = VaultScreen.Home
+            is VaultScreen.Detail -> screen = if (detailCameFromList) VaultScreen.List else VaultScreen.Home
             is VaultScreen.Viewer -> {
-                val recordId = state.attachments.firstOrNull { it.id == s.attachmentId }?.recordId
                 closeViewer()
-                if (recordId != null) VaultScreen.Detail(recordId) else VaultScreen.Home
+                screen = viewerReturn
             }
-            VaultScreen.Edit -> {
-                val id = draft?.id
-                draft = null
-                if (id != null) VaultScreen.Detail(id) else VaultScreen.Home
+            VaultScreen.Edit -> cancelDraft()
+        }
+    }
+
+    /** Abandonne la saisie ; pour une fiche neuve, les pièces déjà scannées sont supprimées. */
+    private fun cancelDraft() {
+        val d = draft ?: run {
+            screen = VaultScreen.Home
+            return
+        }
+        draft = null
+        if (d.isNew) {
+            screen = VaultScreen.Home
+            val pending = attachmentsOf(d.id)
+            if (pending.isNotEmpty()) io {
+                pending.forEach { a ->
+                    c.attachments.delete(a)
+                    state.attachments = state.attachments.filterNot { it.id == a.id }
+                }
             }
+        } else {
+            screen = VaultScreen.Detail(d.id)
         }
     }
 
@@ -202,14 +266,37 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun startDraft(category: Category) {
-        val d = Draft(null, category, c.clock.wallMillis(), favorite = false, title = "", tags = "")
-        Templates.fieldsFor(category).forEach { d.fields += DraftField(it.key, it.type, false, it.isExpiry, "", "", it.sensitive) }
+        val d = Draft(Ids.new(), true, category, c.clock.wallMillis(), favorite = false, title = "", tags = "")
+        fillTemplate(d, category, emptyMap())
         draft = d
         screen = VaultScreen.Edit
     }
 
+    /** Remplit les champs du gabarit ; [keep] conserve les valeurs déjà saisies à la main. */
+    private fun fillTemplate(d: Draft, category: Category, keep: Map<String, DraftField>) {
+        val proposed = d.extraction?.valuesFor(category).orEmpty()
+        val custom = d.fields.filter { it.custom }
+        d.fields.clear()
+        for (spec in Templates.fieldsFor(category)) {
+            val previous = keep[spec.key]?.takeIf { it.value.isNotBlank() && !it.detected }
+            val auto = proposed[spec.key]
+            val value = previous?.value ?: auto?.let { if (spec.type == FieldType.DATE) DateText.toDisplay(it) else it } ?: ""
+            d.fields += DraftField(spec.key, spec.type, false, spec.isExpiry, "", value, spec.sensitive, detected = previous == null && auto != null)
+        }
+        d.fields += custom
+    }
+
+    /** Change la catégorie d'une fiche neuve : les champs proposés suivent, la saisie manuelle est gardée. */
+    fun changeDraftCategory(category: Category) {
+        val d = draft ?: return
+        if (!d.isNew || d.category == category) return
+        val keep = d.fields.filter { !it.custom }.associateBy { it.key }
+        d.category = category
+        fillTemplate(d, category, keep)
+    }
+
     fun edit(record: Record) {
-        val d = Draft(record.id, record.category, record.createdAtMs, record.favorite, record.title, record.tags.joinToString(", "))
+        val d = Draft(record.id, false, record.category, record.createdAtMs, record.favorite, record.title, record.tags.joinToString(", "))
         val existing = record.fields.associateBy { it.key }
         for (spec in Templates.fieldsFor(record.category)) {
             val f = existing[spec.key]?.takeIf { !it.custom }
@@ -268,7 +355,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
         }
         val tags = d.tags.split(',').map { it.trim() }.filter { it.isNotEmpty() }.distinct().take(Limits.MAX_TAGS)
         val now = c.clock.wallMillis()
-        val record = Record(d.id ?: Ids.new(), d.category, d.title.trim(), tags, d.favorite, fields, expiry, d.createdAtMs, now)
+        val record = Record(d.id, d.category, d.title.trim(), tags, d.favorite, fields, expiry, d.createdAtMs, now)
         error = null
         io {
             c.vault.put(record)
@@ -288,8 +375,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
     /** Copie les champs sous un nouvel identifiant et, si demandé, les pièces jointes. */
     fun duplicate(record: Record, copyAttachments: Boolean) = io {
         val now = c.clock.wallMillis()
-        val suffix = getApplication<Application>().getString(R.string.copy_suffix)
-        val copy = record.copy(id = Ids.new(), title = record.title + suffix, favorite = false, createdAtMs = now, updatedAtMs = now)
+        val copy = record.copy(id = Ids.new(), title = record.title + string(R.string.copy_suffix), favorite = false, createdAtMs = now, updatedAtMs = now)
         c.vault.put(copy)
         replaceInState(copy)
         if (copyAttachments) {
@@ -309,6 +395,10 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
         screen = if (detailCameFromList) VaultScreen.List else VaultScreen.Home
     }
 
+    private fun replaceInState(record: Record) {
+        state.set(state.records.filterNot { it.id == record.id } + record, state.unreadable, ::categoryLabel)
+    }
+
     // ------------------------------------------------------------ pièces jointes
 
     fun attachmentsOf(recordId: String): List<AttachmentMeta> = state.attachments.filter { it.recordId == recordId }
@@ -321,7 +411,9 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
         c.timers.startGrace(c.clock.elapsedMillis())
     }
 
-    fun importFrom(uri: Uri, recordId: String, role: AttachmentRole) {
+    private class Source(val name: String, val size: Long, val deleteAfter: File?, val open: () -> InputStream)
+
+    private fun sourceOf(uri: Uri): Source {
         val resolver = c.appContext.contentResolver
         var name = ""
         var size = -1L
@@ -335,7 +427,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
         } catch (e: Exception) {
             // Le fournisseur ne donne ni nom ni taille : on s'en passe.
         }
-        startImport(recordId, role, name, size, deleteAfter = null) { resolver.openInputStream(uri) ?: throw IOException("Fichier inaccessible") }
+        return Source(name, size, null) { resolver.openInputStream(uri) ?: throw IOException("Fichier inaccessible") }
     }
 
     /** Prépare un fichier privé pour l'appareil photo du système. Null si c'est impossible. */
@@ -350,16 +442,15 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
         null
     }
 
-    /** La photo de travail est chiffrée si la prise de vue a réussi, et effacée dans tous les cas. */
-    fun onCaptureResult(success: Boolean, recordId: String, role: AttachmentRole) {
-        val file = captureFile ?: return
+    /** Photo de travail prise par l'appareil photo, ou null si la prise de vue a été abandonnée. */
+    private fun takeCapture(success: Boolean): Source? {
+        val file = captureFile ?: return null
         captureFile = null
         if (!success || file.length() == 0L) {
             file.delete()
-            return
+            return null
         }
-        val name = getApplication<Application>().getString(R.string.attach_photo_name)
-        startImport(recordId, role, name, file.length(), deleteAfter = file) { file.inputStream() }
+        return Source(string(R.string.attach_photo_name), file.length(), file) { file.inputStream() }
     }
 
     fun onCameraMissing() {
@@ -368,19 +459,25 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
         error = R.string.attach_camera_unavailable
     }
 
-    private fun startImport(recordId: String, role: AttachmentRole, name: String, size: Long, deleteAfter: File?, open: () -> java.io.InputStream) {
-        if (importJob?.isActive == true) {
-            deleteAfter?.delete()
+    fun importFrom(uri: Uri, recordId: String, role: AttachmentRole) = startImport(recordId, role, sourceOf(uri))
+
+    fun onCaptureResult(success: Boolean, recordId: String, role: AttachmentRole) {
+        startImport(recordId, role, takeCapture(success) ?: return)
+    }
+
+    private fun startImport(recordId: String, role: AttachmentRole, source: Source) {
+        if (importJob?.isActive == true || scanning) {
+            source.deleteAfter?.delete()
             return
         }
-        if (!canAttach(recordId)) {
-            deleteAfter?.delete()
-            error = R.string.attach_too_many
-            return
+        val refusal = when {
+            !canAttach(recordId) -> R.string.attach_too_many
+            source.size > Limits.MAX_FILE_BYTES -> R.string.attach_too_large
+            else -> null
         }
-        if (size > Limits.MAX_FILE_BYTES) {
-            deleteAfter?.delete()
-            error = R.string.attach_too_large
+        if (refusal != null) {
+            source.deleteAfter?.delete()
+            error = refusal
             return
         }
         importCancelled = false
@@ -389,8 +486,8 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
         importJob = viewModelScope.launch {
             error = try {
                 withContext(Dispatchers.IO) {
-                    val meta = open().use { input ->
-                        c.attachments.import(recordId, role, name, input, size, { importCancelled }) { importProgress = it }
+                    val meta = source.open().use { input ->
+                        c.attachments.import(recordId, role, source.name, input, source.size, { importCancelled }) { importProgress = it }
                     }
                     val problem = validate(meta)
                     if (problem != null) {
@@ -401,44 +498,59 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                         null
                     }
                 }
-            } catch (e: ImportException) {
-                when (e.reason) {
-                    ImportException.Reason.UNSUPPORTED_FORMAT -> R.string.attach_unsupported
-                    ImportException.Reason.TOO_LARGE -> R.string.attach_too_large
-                    ImportException.Reason.CANCELLED -> null
-                }
-            } catch (e: NoSpaceException) {
-                R.string.attach_no_space
             } catch (e: Exception) {
-                R.string.attach_failed
+                messageFor(e)
             } finally {
-                deleteAfter?.delete()
+                source.deleteAfter?.delete()
                 importProgress = null
             }
         }
+    }
+
+    @StringRes
+    private fun messageFor(e: Exception): Int? = when (e) {
+        is ImportException -> when (e.reason) {
+            ImportException.Reason.UNSUPPORTED_FORMAT -> R.string.attach_unsupported
+            ImportException.Reason.TOO_LARGE -> R.string.attach_too_large
+            ImportException.Reason.CANCELLED -> null
+        }
+        is NoSpaceException -> R.string.attach_no_space
+        is SecurityException -> R.string.attach_pdf_protected
+        is UnreadableDocument -> R.string.attach_corrupted
+        else -> R.string.attach_failed
     }
 
     fun cancelImport() {
         importCancelled = true
     }
 
-    /** Vérifie que la pièce importée s'ouvre réellement ; renvoie le message d'erreur sinon. */
+    private class UnreadableDocument : IOException("Document illisible")
+
+    /** Première page ou image, décodée avec des dimensions bornées. Lève une exception si le document ne s'ouvre pas. */
+    private fun firstPage(bytes: ByteArray, format: FileFormat): Bitmap =
+        if (format == FileFormat.PDF) {
+            try {
+                PdfSession(bytes, c.attachments.viewDir).use { if (it.pageCount < 1) throw UnreadableDocument() else it.render(0, 1600) }
+            } catch (e: SecurityException) {
+                throw e
+            } catch (e: UnreadableDocument) {
+                throw e
+            } catch (e: Exception) {
+                throw UnreadableDocument()
+            }
+        } else {
+            ImageRenderer.decode(bytes) ?: throw UnreadableDocument()
+        }
+
+    /** Vérifie que la pièce importée s'ouvre réellement et prépare son aperçu ; renvoie le message d'erreur sinon. */
     @StringRes
     private fun validate(meta: AttachmentMeta): Int? {
         val bytes = c.attachments.readAll(meta)
-        try {
-            if (meta.format == FileFormat.PDF) {
-                try {
-                    PdfSession(bytes, c.attachments.viewDir).use { if (it.pageCount < 1) return R.string.attach_corrupted }
-                } catch (e: SecurityException) {
-                    return R.string.attach_pdf_protected
-                } catch (e: Exception) {
-                    return R.string.attach_corrupted
-                }
-            } else if (ImageRenderer.decode(bytes) == null) {
-                return R.string.attach_corrupted
-            }
-            return null
+        return try {
+            c.attachments.putThumb(meta, Thumbnails.jpeg(firstPage(bytes, meta.format)))
+            null
+        } catch (e: Exception) {
+            messageFor(e)
         } finally {
             bytes.wipe()
         }
@@ -447,12 +559,113 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
     fun deleteAttachment(meta: AttachmentMeta) = io {
         c.attachments.delete(meta)
         state.attachments = state.attachments.filterNot { it.id == meta.id }
+        thumbs.remove(meta.id)
+    }
+
+    /** Demande l'aperçu d'une pièce ; il apparaît dans [thumbs] dès qu'il est prêt. */
+    fun requestThumb(meta: AttachmentMeta) {
+        synchronized(thumbsRequested) { if (!thumbsRequested.add(meta.id)) return }
+        viewModelScope.launch(thumbDispatcher) {
+            try {
+                val jpeg = c.attachments.thumb(meta) ?: run {
+                    // Pièce importée avant l'existence des aperçus : on le fabrique une fois.
+                    val bytes = c.attachments.readAll(meta)
+                    try {
+                        Thumbnails.jpeg(firstPage(bytes, meta.format)).also { c.attachments.putThumb(meta, it) }
+                    } finally {
+                        bytes.wipe()
+                    }
+                }
+                BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size)?.let { thumbs[meta.id] = it.asImageBitmap() }
+            } catch (e: Exception) {
+                // Pas d'aperçu : l'interface montre une icône à la place.
+            } catch (e: OutOfMemoryError) {
+                // Idem.
+            }
+        }
+    }
+
+    // ------------------------------------------------------------ scan et lecture automatique
+
+    fun scanFromUri(uri: Uri) = startScan(sourceOf(uri))
+
+    fun onScanCapture(success: Boolean) {
+        startScan(takeCapture(success) ?: return)
+    }
+
+    private fun readBounded(input: InputStream): ByteArray {
+        val out = ByteArrayOutputStream()
+        val buf = ByteArray(64 * 1024)
+        while (true) {
+            val n = input.read(buf)
+            if (n < 0) break
+            if (out.size() + n > Limits.MAX_FILE_BYTES) throw ImportException(ImportException.Reason.TOO_LARGE)
+            out.write(buf, 0, n)
+        }
+        return out.toByteArray()
+    }
+
+    /**
+     * Scan d'un document : le fichier est lu une fois, son texte est reconnu sur
+     * l'appareil, la pièce est chiffrée, puis une fiche pré-remplie est proposée à la
+     * relecture. Rien n'est enregistré comme fiche tant que l'utilisateur n'a pas validé.
+     */
+    private fun startScan(source: Source) {
+        if (scanning || importJob?.isActive == true) {
+            source.deleteAfter?.delete()
+            return
+        }
+        scanning = true
+        error = null
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    val bytes = source.open().use { readBounded(it) }
+                    try {
+                        val format = FileSignature.detect(bytes.copyOf(minOf(bytes.size, FileSignature.PROBE_BYTES)))
+                            ?: throw ImportException(ImportException.Reason.UNSUPPORTED_FORMAT)
+                        val page = firstPage(bytes, format)
+                        val text = try {
+                            TextReader.read(page)
+                        } catch (e: Exception) {
+                            ""
+                        }
+                        val extraction = DocumentReader.read(text, today())
+                        val category = extraction.category ?: Category.OTHER
+                        val recordId = Ids.new()
+                        val role = Templates.rolesFor(category).first()
+                        val meta = c.attachments.import(recordId, role, source.name, ByteArrayInputStream(bytes), bytes.size.toLong(), { false }) {}
+                        c.attachments.putThumb(meta, Thumbnails.jpeg(page))
+                        state.attachments = state.attachments + meta
+
+                        val d = Draft(recordId, true, category, c.clock.wallMillis(), false, extraction.docType.orEmpty(), "", extraction)
+                        d.titleDetected = extraction.docType != null
+                        fillTemplate(d, category, emptyMap())
+                        if (category == Category.IDENTITY && extraction.birthDate != null) {
+                            d.fields += DraftField(Ids.new(), FieldType.DATE, true, false, string(R.string.field_birth_date), DateText.format(extraction.birthDate!!), false, detected = true)
+                        }
+                        draft = d
+                        screen = VaultScreen.Edit
+                    } finally {
+                        bytes.wipe()
+                    }
+                }
+            } catch (e: Exception) {
+                error = messageFor(e) ?: R.string.attach_failed
+            } catch (e: OutOfMemoryError) {
+                error = R.string.attach_too_large
+            } finally {
+                source.deleteAfter?.delete()
+                scanning = false
+            }
+        }
     }
 
     // ------------------------------------------------------------ visionneuse
 
     fun openAttachment(meta: AttachmentMeta) {
         closeViewer()
+        viewerReturn = screen
         viewer = ViewerState.Loading
         screen = VaultScreen.Viewer(meta.id)
         viewModelScope.launch {
@@ -503,10 +716,6 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
 
     override fun onCleared() {
         closeViewer()
-    }
-
-    private fun replaceInState(record: Record) {
-        state.set(state.records.filterNot { it.id == record.id } + record, state.unreadable, ::categoryLabel)
     }
 
     /** Opération sur le coffre hors du fil principal ; un verrouillage survenu entre-temps est signalé. */

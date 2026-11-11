@@ -36,6 +36,7 @@ class AttachmentStore(context: Context, private val db: VaultDb, private val gat
     val viewDir = File(context.cacheDir, "view")
 
     private fun file(id: String) = File(dir, "$id.enc")
+    private fun thumbFile(id: String) = File(dir, "$id.thumb")
 
     /** Au démarrage : fichiers de travail en clair, imports interrompus et fichiers orphelins. */
     fun cleanup() {
@@ -44,8 +45,9 @@ class AttachmentStore(context: Context, private val db: VaultDb, private val gat
         dir.mkdirs()
         val known = db.attachments().ids().toSet()
         dir.listFiles()?.forEach { f ->
-            val id = f.name.removeSuffix(".enc")
-            if (!f.name.endsWith(".enc") || id !in known) f.delete()
+            val knownSuffix = f.name.endsWith(".enc") || f.name.endsWith(".thumb")
+            val id = f.name.substringBefore('.')
+            if (!knownSuffix || id !in known) f.delete()
         }
     }
 
@@ -109,6 +111,24 @@ class AttachmentStore(context: Context, private val db: VaultDb, private val gat
         if (!gate.isOpen) throw app.mespapiers.core.access.VaultLockedException()
         db.attachments().delete(meta.id)
         file(meta.id).delete()
+        thumbFile(meta.id).delete()
+    }
+
+    /** Enregistre l'aperçu réduit (JPEG) d'une pièce, chiffré. */
+    fun putThumb(meta: AttachmentMeta, jpeg: ByteArray) = withKey { key ->
+        val tmp = File(dir, "${meta.id}.thumb.tmp")
+        tmp.writeBytes(AttachmentVault.sealThumb(key, meta.id, jpeg))
+        if (!tmp.renameTo(thumbFile(meta.id))) tmp.delete()
+    }
+
+    /** Aperçu déchiffré, ou null s'il n'existe pas encore ou n'est pas lisible. */
+    fun thumb(meta: AttachmentMeta): ByteArray? = withKey { key ->
+        val f = thumbFile(meta.id)
+        if (!f.isFile) null else try {
+            AttachmentVault.openThumb(key, meta.id, f.readBytes())
+        } catch (e: Exception) {
+            null
+        }
     }
 
     /** Copie une pièce vers une autre fiche (duplication), en flux, sous un nouvel identifiant. */

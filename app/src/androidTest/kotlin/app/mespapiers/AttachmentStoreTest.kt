@@ -168,6 +168,21 @@ class AttachmentStoreTest {
     }
 
     @Test
+    fun apercu_chiffre_supprime_avec_la_piece() {
+        val meta = import(png(), "recto.png")
+        assertNull(store.thumb(meta))
+        val jpeg = "APERCU-EN-CLAIR".toByteArray()
+        store.putThumb(meta, jpeg)
+        assertArrayEquals(jpeg, store.thumb(meta))
+        val onDisk = String(File(filesDir, "${meta.id}.thumb").readBytes(), Charsets.ISO_8859_1)
+        assertFalse(onDisk.contains("APERCU-EN-CLAIR"))
+        store.cleanup()
+        assertEquals(listOf("${meta.id}.enc", "${meta.id}.thumb"), encryptedFiles())
+        store.delete(meta)
+        assertEquals(emptyList<String>(), encryptedFiles())
+    }
+
+    @Test
     fun copie_vers_une_autre_fiche_sous_un_nouvel_identifiant() {
         val original = import(png(), "recto.png")
         val other = Ids.new()
