@@ -16,6 +16,9 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Tests du noyau (JVM)
         run: ./gradlew :core:test
+      - name: Résumé des tests du noyau
+        if: always()
+        run: grep -ho '<testsuite [^>]*' core/build/test-results/test/*.xml | sed -E 's/.*name="([^"]*)".*tests="([0-9]*)".*failures="([0-9]*)" errors="([0-9]*)".*/RESUME-NOYAU \1 tests=\2 echecs=\3 erreurs=\4/'
       - name: Lint et tests unitaires de l'application
         run: ./gradlew :app:lintProdRelease :app:testProdDebugUnitTest
       - name: APK de démonstration et APK prod
@@ -52,6 +55,9 @@ jobs:
           target: default
           disable-animations: true
           script: ./gradlew :app:connectedDemoDebugAndroidTest
+      - name: Résumé des tests instrumentés
+        if: always()
+        run: grep -rho '<testsuite [^>]*' app/build/outputs/androidTest-results/ | sed -E 's/.*name="([^"]*)".*tests="([0-9]*)".*failures="([0-9]*)" errors="([0-9]*)".*/RESUME-APPAREIL \1 tests=\2 echecs=\3 erreurs=\4/'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
