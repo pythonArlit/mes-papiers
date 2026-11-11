@@ -1,6 +1,6 @@
 # Revue OWASP MASVS (v2)
 
-Revue **intermédiaire**, faite sur un noyau testé et un squelette Android non compilé. Aucun contrôle ne peut être déclaré satisfait tant que l'application n'existe pas sur un appareil : les statuts ci-dessous disent où en est la préparation.
+Revue **intermédiaire** au 11/11/2026 : noyau testé, accès et fiches en place côté Android et testés sur émulateur, le reste à faire. Aucun contrôle n'est déclaré satisfait tant que l'application n'est pas complète et vérifiée sur un appareil réel. La colonne de preuve date en partie de la première revue ; `TESTS.md` et `ECARTS.md` font foi pour l'état exact.
 
 Statuts : **Noyau prêt** (logique écrite et testée sur JVM, reste à brancher et à vérifier sur appareil), **Squelette** (écrit, non compilé), **À faire**, **Sans objet**.
 

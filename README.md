@@ -2,8 +2,9 @@
 
 > **État au 11 novembre 2026 : ne pas utiliser avec des documents réels.**
 >
-> - L'application Android **n'existe pas encore** : le module `:app` est un squelette qui n'a **jamais été compilé** (pas de SDK Android ni d'accès aux dépôts dans l'environnement de développement). Aucun APK, aucune capture d'écran.
-> - Seul le noyau de sécurité (`:core`, Kotlin pur) est écrit et testé : 75 tests JVM réussis.
+> - L'application se compile et s'installe, mais elle est **incomplète** : pas de pièces jointes, pas de partage, pas de rappels, **pas de sauvegarde**. Sans sauvegarde, perdre le téléphone ou un facteur d'accès, c'est tout perdre.
+> - La variante `demo` ne demande **pas** le code de l'application d'authentification (raccourci de démonstration) : elle n'a que la protection de la phrase secrète.
+> - L'interface n'a été vérifiée par aucun test ni sur aucun téléphone réel.
 > - Le chiffrement n'utilise pas Tink mais AES-256-GCM de la plateforme avec une construction en flux propre au projet, non relue par un tiers.
 >
 > Détail et liste des points à lever : [`ECARTS.md`](ECARTS.md).
@@ -12,14 +13,16 @@ Application Android individuelle et hors connexion pour conserver et retrouver p
 
 ## Avancement par jalon
 
-| Jalon | Noyau (`:core`, testé) | Application (`:app`) |
+| Jalon | Noyau (`:core`) | Application (`:app`) |
 | --- | --- | --- |
-| J0 Architecture, menaces, décisions | Fait : `DECISIONS.md`, `MENACES.md` | — |
-| J1 Accès et stockage chiffré | Fait : dérivation, hiérarchie de clés, TOTP, anti-rejeu, délai progressif, session, chiffrement | Squelette : horloge, clé Keystore, manifeste |
-| J2 Fiches et pièces jointes | Fait : modèle, sérialisation, chiffrement en flux, recherche, contrôles de format, signature de fichier | À faire |
-| J3 Partage et échéances | Fait : état des échéances, calendrier des rappels, verrouillage automatique | À faire |
-| J4 Sauvegarde et restauration | Fait : phrase de récupération, format d'archive, lecture vérifiée | À faire |
-| J5 Recette et revue MASVS | Tests JVM et contrôle par mutation : `TESTS.md` ; revue intermédiaire : `MASVS.md` | À faire |
+| J0 Architecture, menaces, décisions | Fait | — |
+| J1 Accès et stockage chiffré | Fait et testé | Fait : configuration, connexion en deux étapes, verrouillage ; testé sur émulateur avec le vrai Keystore. Manquent les écrans de paramètres |
+| J2 Fiches et pièces jointes | Fait et testé | Fiches faites (Room chiffré, accueil, liste, détail, édition). **Pièces jointes à faire** |
+| J3 Partage et échéances | Calcul fait et testé | État des échéances affiché. Partage et rappels à faire |
+| J4 Sauvegarde et restauration | Format fait et testé | À faire |
+| J5 Recette et revue MASVS | 83 tests JVM, contrôle par mutation | 11 tests instrumentés ; recette manuelle à faire |
+
+Chaque poussée sur `main` déclenche la CI : tests du noyau, lint, APK `demo` et `prod`, contrôle de l'APK `prod`, tests sur émulateur. L'APK de démonstration est téléchargeable dans les artefacts de l'exécution (`apk-demo`).
 
 ## Organisation du dépôt
 
@@ -38,23 +41,24 @@ Documents : `DECISIONS.md` (choix et versions), `MENACES.md` (modèle de menaces
 
 ## Commandes
 
-Tests du noyau, sans Gradle ni réseau (c'est la commande qui a été exécutée) :
+Tests du noyau, sans Gradle ni réseau :
 
 ```
 tools/run-core-tests.sh /chemin/vers/une/distribution/gradle
 ```
 
-Par Gradle (non exécuté à ce jour) :
+Par Gradle (ce que la CI exécute) :
 
 ```
 ./gradlew :core:test                 # tests JVM du noyau
 ./gradlew :app:assembleDemoDebug     # APK de démonstration
 ./gradlew :app:lintProdRelease       # lint de la variante prod
+./gradlew :app:connectedDemoDebugAndroidTest   # tests instrumentés, appareil ou émulateur branché
 ```
 
 ## Produire un APK
 
-Procédure prévue, **jamais déroulée** ; elle devra être corrigée à la première compilation.
+La compilation des deux APK est exécutée par la CI. La signature de production, elle, n'a jamais été essayée.
 
 **APK de démonstration** (identifiant `app.mespapiers.demo`, bandeau « DÉMO », captures autorisées) :
 
@@ -78,10 +82,10 @@ adb install -r app/build/outputs/apk/demo/debug/app-demo-debug.apk
 3. Compiler puis contrôler l'APK :
    ```
    MESPAPIERS_SIGNING=/chemin/absolu/signature.properties ./gradlew :app:assembleProdRelease
-   tools/check-apk.sh app/build/outputs/apk/prod/release/app-prod-release.apk
+   tools/check-apk.sh app/build/outputs/apk/prod/release/*.apk
    ```
 
-Sans `MESPAPIERS_SIGNING`, l'APK `prod` est produit non signé. `tools/check-apk.sh` refuse l'APK s'il contient `INTERNET`, une permission hors liste blanche, un élément de démonstration, s'il est débogable ou si la sauvegarde automatique n'est pas désactivée.
+Sans `MESPAPIERS_SIGNING`, l'APK `prod` est produit non signé (`app-prod-release-unsigned.apk`) et ne peut pas être installé. `tools/check-apk.sh` refuse l'APK s'il contient `INTERNET`, une permission hors liste blanche, un élément de démonstration, s'il est débogable ou si la sauvegarde automatique n'est pas désactivée.
 
 ## Variantes
 
@@ -90,4 +94,4 @@ Sans `MESPAPIERS_SIGNING`, l'APK `prod` est produit non signé. `tools/check-apk
 | Identifiant | `app.mespapiers` | `app.mespapiers.demo` |
 | Données fictives | Absentes du code | `app/src/demo` |
 | Captures d'écran | Bloquées | Autorisées |
-| Double validation | Réelle | Réelle, sans raccourci |
+| Double validation | Phrase puis TOTP | **Phrase seule** : le TOTP est calculé automatiquement (raccourci de démonstration, `ECARTS.md` E-09) |

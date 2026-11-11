@@ -20,31 +20,33 @@ Chaque décision indique son état : **en place** (code écrit et testé sur JVM
 
 ## Versions
 
-**D-02 — Versions retenues.**
+**D-02 — Versions retenues.** Toutes résolues, compilées et exécutées par la CI le 11/11/2026.
 
-| Élément | Version | Vérification |
-| --- | --- | --- |
-| Kotlin (compilation et tests du noyau ici) | 2.0.21 | Exécuté |
-| Bouncy Castle `bcprov-jdk18on` | 1.78.1 | Exécuté (tests du noyau) |
-| JUnit | 4.13.2 | Exécuté |
-| JDK | 21 ici, 17 visé par le build | 21 exécuté |
-| Android Gradle Plugin | 9.5.1 | Relevé sur developer.android.com le 11/11/2026, non résolu |
-| Gradle (wrapper) | 9.6.0 | Minimum exigé par AGP 9.5, non téléchargé |
-| compileSdk / targetSdk | 37 | Maximum pris en charge par AGP 9.5, non compilé |
-| Kotlin (build Gradle) | 2.4.10 | Non résolu |
-| Compose BOM | 2026.09.00 | Non résolu |
-| activity-compose, core-ktx, lifecycle | 1.13.0, 1.18.0, 2.10.0 | **Supposées**, à confirmer à la première synchronisation |
+| Élément | Version |
+| --- | --- |
+| Android Gradle Plugin | 9.5.1 |
+| Gradle (wrapper) | 9.6.0 |
+| Kotlin | 2.4.10 (Kotlin intégré à AGP 9, plugin Compose 2.4.10) |
+| KSP | 2.3.4 |
+| JDK | 17 |
+| compileSdk / targetSdk / minSdk | 37 / 37 / 26 |
+| Compose BOM | 2026.09.00 |
+| activity-compose, core-ktx, lifecycle | 1.13.0, 1.18.0, 2.10.0 |
+| Room | 2.8.4 |
+| ZXing core (QR hors ligne) | 3.5.3 |
+| Bouncy Castle `bcprov-jdk18on` | 1.78.1 |
+| JUnit, androidx.test runner, ext-junit | 4.13.2, 1.6.2, 1.2.1 |
 
-Bouncy Castle est figé sur la version réellement testée ; toute montée de version repasse par `:core:test`. Room, KSP et les bibliothèques de test instrumenté seront ajoutés au catalogue quand le code qui les utilise sera écrit, pour ne pas afficher de versions jamais essayées.
+Ce sont des versions qui fonctionnent ensemble ; je n'ai pas vérifié pour chacune qu'elle est la plus récente. Bouncy Castle est figé sur la version testée ; toute montée de version repasse par `:core:test`.
 
-**D-03 — minSdk 26.** *Squelette.*
+**D-03 — minSdk 26.** *En place.*
 Android 8.0 apporte `java.time` (dates civiles sans bibliothèque de substitution), les canaux de notification et les icônes adaptatives ; Keystore AES-GCM (API 23) et le compteur de démarrages (API 24) sont déjà là. Comportement dégradé selon la version :
 
 | API | Fonction | Avant cette API |
 | --- | --- | --- |
 | 28 | StrongBox | Clé dans le TEE |
 | 31 | `dataExtractionRules` (cloud et transfert d'appareil) | `allowBackup="false"` et `fullBackupContent` |
-| 31 | Masquage des fenêtres superposées (`setHideOverlayWindows`) | `filterTouchesWhenObscured` seul |
+| — | Masquage des fenêtres superposées | `filterTouchesWhenObscured` sur toutes les versions ; `setHideOverlayWindows` exige une permission hors liste blanche (`ECARTS.md` E-11) |
 | 33 | Presse-papiers marqué sensible | Effacement après 60 s seulement |
 | 33 | Permission `POST_NOTIFICATIONS` à l'exécution | Notifications autorisées par défaut |
 | 30 | Rendu PDF depuis la mémoire (`memfd_create`) | Fichier temporaire privé, effacé à la fermeture, au verrouillage et au démarrage |
@@ -57,7 +59,7 @@ Bouncy Castle est maintenue et en pur JVM : la même implémentation tourne dans
 **D-05 — La phrase est normalisée en NFC avant dérivation.** *En place.*
 Une même phrase accentuée saisie avec deux claviers doit ouvrir le coffre. Contrepartie : la normalisation crée une chaîne transitoire que la JVM ne permet pas d'effacer.
 
-**D-06 — Hiérarchie de clés.** *En place côté noyau, clé Keystore en squelette.*
+**D-06 — Hiérarchie de clés.** *En place ; clé Keystore testée sur émulateur.*
 
 ```
 phrase ──Argon2id──▶ maître ──HKDF──▶ kSeed, kData
@@ -90,8 +92,8 @@ Tink n'a pas pu être téléchargé dans l'environnement de développement. Plut
 **D-11 — Chiffrement en flux.** *En place.*
 Segments de 64 Kio, chacun en AES-256-GCM. Nonce = préfixe aléatoire (7 octets) + compteur (4) + drapeau « dernier segment » (1). Clé propre à chaque fichier, dérivée par HKDF avec un sel aléatoire de 16 octets. L'en-tête et le contexte (identifiant de la pièce) sont authentifiés avec chaque segment. C'est la construction « STREAM », la même famille que le chiffrement en flux de Tink. Mémoire constante quelle que soit la taille du fichier.
 
-**D-12 — Une fiche = un enregistrement chiffré en bloc.** *Sérialisation en place, Room prévu.*
-Room stockera `(identifiant, blob chiffré)`. Titre, étiquettes, champs, catégorie, favori et échéance sont tous dans le blob : aucune colonne en clair, donc rien à craindre du journal SQLite ni des index. La recherche et les filtres utilisent un index en mémoire reconstruit au déverrouillage et vidé au verrouillage ; à 500 fiches, c'est immédiat.
+**D-12 — Une fiche = un enregistrement chiffré en bloc.** *En place, testé sur émulateur.*
+Room stocke `(identifiant, blob chiffré)`. Titre, étiquettes, champs, catégorie, favori et échéance sont tous dans le blob : aucune colonne en clair, donc rien à craindre du journal SQLite ni des index. La recherche et les filtres utilisent un index en mémoire reconstruit au déverrouillage et vidé au verrouillage ; à 500 fiches, c'est immédiat.
 
 **D-13 — Identifiants.** *En place.* UUID aléatoires en minuscules, validés par expression régulière à chaque décodage : un identifiant venu d'une archive ne peut pas former un chemin.
 
@@ -115,7 +117,13 @@ En-tête en clair (magie, version, paramètres de dérivation, contrôle de clé
 
 ## Variantes
 
-**D-20 — `demo` sans raccourci.** *Squelette.* La double validation y est identique. Les éléments de démonstration vivent dans `app/src/demo` et ne sont pas compilés dans `prod` ; `tools/check-apk.sh` le contrôle sur l'APK.
+**D-20 — `demo` : seconde étape automatique.** *En place, à la demande du commanditaire (11/11/2026).* Pour faciliter les essais pendant le développement, la démo ne demande pas le code TOTP : la graine est gardée en clair dans le stockage privé de la démo et le code est calculé automatiquement (`app/src/demo/.../SecondFactor.kt`). Le noyau n'est pas modifié et aucun contournement n'existe dans `prod`, dont le jeu de sources contient un `SecondFactor` vide. Les éléments de démonstration vivent dans `app/src/demo` et ne sont pas compilés dans `prod` ; `tools/check-apk.sh` le contrôle sur l'APK.
+
+**D-21 — État d'accès dans des fichiers, pas dans Room.** *En place.* Paramètres de dérivation, enveloppes de clés, compteur d'échecs et dernier pas TOTP sont écrits par `FileGateStore` (fichier temporaire synchronisé puis renommage atomique) dans `noBackupFilesDir`. Un fichier abîmé lève une erreur et n'est jamais pris pour une installation neuve.
+
+**D-22 — QR par ZXing.** *En place.* Génération locale, sans service distant ni permission.
+
+**D-23 — Navigation par état, sans bibliothèque de navigation.** *En place.* Une seule activité exportée ; l'écran affiché découle de l'état d'accès, donc tout lancement mène à la connexion tant que la session est verrouillée. L'état sauvegardé de l'activité est ignoré.
 
 ## Points ouverts à valider sur appareil
 
