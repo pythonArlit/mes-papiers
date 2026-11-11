@@ -3,7 +3,11 @@
     <string name="app_name">Mes Papiers</string>
     <string name="app_subtitle">Tes pièces d’identité, diplômes et documents importants</string>
     <string name="demo_banner">DÉMO</string>
-    <string name="skeleton_notice">Cette version est un squelette : le coffre n’est pas encore utilisable. N’y range aucun document réel.</string>
+    <string name="working">Un instant…</string>
+    <string name="action_continue">Continuer</string>
+    <string name="action_back">Retour</string>
+    <string name="action_show">Afficher</string>
+    <string name="action_hide">Masquer</string>
 
     <!-- Catégories -->
     <string name="category_identity">Identité</string>
@@ -13,14 +17,67 @@
     <string name="category_bank">Banque</string>
     <string name="category_other">Autres</string>
 
+    <!-- Configuration initiale -->
+    <string name="intro_title">Bienvenue</string>
+    <string name="intro_body">Mes Papiers garde tes documents chiffrés sur ce téléphone, sans compte et sans connexion.</string>
+    <string name="intro_two_steps_title">Deux étapes pour ouvrir</string>
+    <string name="intro_two_steps_body">Tu choisis une phrase secrète, puis tu associes une application d’authentification (Aegis, Google Authenticator, FreeOTP…) qui te donnera un code à six chiffres à chaque ouverture.</string>
+    <string name="intro_no_reset_title">Aucune réinitialisation possible</string>
+    <string name="intro_no_reset_body">Il n’existe ni code de secours ni « mot de passe oublié ». Si tu oublies ta phrase ou perds ton application d’authentification, la seule solution sera de réinstaller Mes Papiers puis de restaurer une archive de sauvegarde avec ta phrase de récupération. Sans archive ou sans phrase de récupération, tes documents sont perdus.</string>
+    <string name="intro_same_device_title">Deux téléphones, c’est mieux</string>
+    <string name="intro_same_device_body">Si l’application d’authentification est sur ce même téléphone, une personne qui le tient déverrouillé n’a plus qu’à connaître ta phrase. Pour mieux séparer les deux étapes, installe l’application d’authentification sur un autre appareil.</string>
+    <string name="intro_no_lock_title">Ce téléphone n’a pas de verrouillage d’écran</string>
+    <string name="intro_no_lock_body">Sans code, schéma ou empreinte, tes documents sont moins bien protégés en cas de perte ou de vol. Active un verrouillage d’écran dans les réglages du téléphone.</string>
+    <string name="intro_start">Créer mon coffre</string>
+
+    <string name="create_title">Ta phrase secrète</string>
+    <string name="create_body">Au moins 12 caractères. Une suite de mots que toi seul peux retrouver vaut mieux qu’un mot compliqué. Aucune règle de majuscules ou de chiffres.</string>
+    <string name="create_field">Phrase secrète</string>
+    <string name="create_confirm_field">Répète la phrase</string>
+    <string name="create_mismatch">Les deux saisies sont différentes.</string>
+    <string name="create_too_short">Il faut au moins 12 caractères.</string>
+    <string name="create_preparing">Préparation du coffre : cela peut prendre quelques secondes.</string>
+    <string name="strength_label">Robustesse : %1$s</string>
+    <string name="strength_too_short">trop courte</string>
+    <string name="strength_weak">faible</string>
+    <string name="strength_fair">correcte</string>
+    <string name="strength_good">bonne</string>
+    <string name="strength_strong">très bonne</string>
+
+    <string name="enroll_title">Associe ton application d’authentification</string>
+    <string name="enroll_body">Scanne ce code avec l’application d’authentification d’un autre appareil. Si elle est sur ce téléphone, utilise le bouton ou recopie la clé.</string>
+    <string name="enroll_qr_description">Code QR d’association</string>
+    <string name="enroll_open_app">Ouvrir dans mon application d’authentification</string>
+    <string name="enroll_no_app">Aucune application d’authentification n’a été trouvée sur ce téléphone.</string>
+    <string name="enroll_manual_key">Clé à saisir à la main</string>
+    <string name="enroll_issuer_hint">Nom du compte : Mes Papiers · code à 6 chiffres · 30 secondes</string>
+    <string name="enroll_code_field">Code à six chiffres</string>
+    <string name="enroll_confirm">Vérifier et terminer</string>
+    <string name="enroll_warning">Après cette étape, la clé ne sera plus jamais affichée.</string>
+
     <!-- Accès -->
+    <string name="login_title">Ouvrir le coffre</string>
+    <string name="login_step1">Étape 1 sur 2 : ta phrase secrète</string>
+    <string name="login_step2">Étape 2 sur 2 : le code de ton application d’authentification</string>
+    <string name="login_unlock">Continuer</string>
+    <string name="login_open">Ouvrir</string>
+    <string name="login_time_left">Temps restant pour saisir le code : %1$s</string>
+    <string name="login_cancel">Recommencer depuis l’étape 1</string>
     <string name="passphrase_wrong">Phrase secrète incorrecte.</string>
     <string name="passphrase_wait">Trop d’essais. Réessaie dans %1$s.</string>
-    <string name="totp_wrong">Code incorrect. Il te reste %1$d essais.</string>
-    <string name="totp_expired">Ce code n’est plus valable. Vérifie que l’heure de ton téléphone est réglée automatiquement.</string>
-    <string name="totp_already_used">Ce code a déjà servi. Attends le code suivant.</string>
+    <string name="totp_wrong">Code incorrect. Essais restants : %1$d.</string>
+    <string name="totp_expired">Ce code n’est plus valable. Vérifie que la date et l’heure de tes appareils sont réglées automatiquement. Essais restants : %1$d.</string>
+    <string name="totp_already_used">Ce code a déjà servi. Attends le code suivant. Essais restants : %1$d.</string>
+    <string name="totp_enroll_wrong">Code incorrect. Vérifie la clé saisie dans ton application d’authentification.</string>
+    <string name="totp_enroll_expired">Ce code n’est plus valable. Vérifie que la date et l’heure de tes appareils sont réglées automatiquement.</string>
     <string name="totp_back_to_passphrase">Trop d’essais ou délai dépassé. Saisis de nouveau ta phrase secrète.</string>
-    <string name="vault_unreadable">Le coffre de ce téléphone n’est plus lisible. Réinstalle l’application puis restaure ta dernière archive avec ta phrase de récupération.</string>
+    <string name="vault_unreadable_title">Coffre illisible</string>
+    <string name="vault_unreadable">Le coffre de ce téléphone n’est plus lisible : sa clé de protection a disparu ou ses fichiers sont abîmés. Ta phrase secrète ne suffit plus. Réinstalle l’application puis restaure ta dernière archive avec ta phrase de récupération.</string>
+
+    <!-- Accueil provisoire -->
+    <string name="home_open">Coffre ouvert</string>
+    <string name="home_pending">Les fiches, les pièces jointes, les échéances et la sauvegarde ne sont pas encore disponibles dans cette version. N’y range aucun document réel.</string>
+    <string name="home_lock">Verrouiller</string>
 
     <!-- Notifications : toujours neutres, jamais de titre ni de catégorie. -->
     <string name="reminder_title">Mes Papiers</string>
