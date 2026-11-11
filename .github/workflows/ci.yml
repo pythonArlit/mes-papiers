@@ -57,7 +57,7 @@ jobs:
           script: ./gradlew :app:connectedDemoDebugAndroidTest
       - name: Résumé des tests instrumentés
         if: always()
-        run: grep -rho '<testsuite [^>]*' app/build/outputs/androidTest-results/ | sed -E 's/.*name="([^"]*)".*tests="([0-9]*)".*failures="([0-9]*)" errors="([0-9]*)".*/RESUME-APPAREIL \1 tests=\2 echecs=\3 erreurs=\4/'
+        run: find app/build -name 'TEST-*.xml' -path '*ndroid*' | xargs -r grep -ho '<testsuite [^>]*' | sed -E 's/.*name="([^"]*)".*tests="([0-9]*)".*failures="([0-9]*)" errors="([0-9]*)".*/RESUME-APPAREIL \1 tests=\2 echecs=\3 erreurs=\4/'
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -15,10 +15,15 @@ import app.mespapiers.core.docs.LockConfig
 import app.mespapiers.core.docs.LockTimers
 import app.mespapiers.platform.AndroidClock
 import app.mespapiers.platform.KeystoreDeviceKey
+import androidx.room.Room
+import app.mespapiers.data.Vault
+import app.mespapiers.data.VaultDb
+import app.mespapiers.data.VaultState
 import java.io.File
 
 /** Objets partagés par toute l'application. Rien de sensible n'y survit au verrouillage. */
 class AppContainer(context: Context) {
+    val appContext: Context = context.applicationContext
     val clock = AndroidClock(context)
     val seedKey = KeystoreDeviceKey(KeystoreDeviceKey.ALIAS_SEED)
     val dataKey = KeystoreDeviceKey(KeystoreDeviceKey.ALIAS_DATA)
@@ -31,6 +36,16 @@ class AppContainer(context: Context) {
 
     val gate = SessionGate(store, seedKey, dataKey, clock, newKdfParams = ::freshKdf)
     val timers = LockTimers(LockConfig())
+
+    private val db = Room.databaseBuilder(appContext, VaultDb::class.java, "vault.db").build()
+    val vault = Vault(db, gate)
+    val vaultState = VaultState()
+
+    /** Verrouille la session et vide tout ce qui a été déchiffré en mémoire. */
+    fun lockNow() {
+        gate.lock()
+        vaultState.clear()
+    }
 
     private val keyguard = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
 
@@ -78,7 +93,7 @@ class MesPapiersApp : Application() {
         // Extinction de l'écran : verrouillage immédiat, étape intermédiaire comprise.
         val screenOff = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
-                container.gate.lock()
+                container.lockNow()
             }
         }
         ContextCompat.registerReceiver(this, screenOff, IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_NOT_EXPORTED)

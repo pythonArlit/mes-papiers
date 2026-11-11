@@ -14,6 +14,7 @@ import app.mespapiers.ui.AppRoot
  */
 class MainActivity : ComponentActivity() {
     private val vm: AccessViewModel by viewModels()
+    private val vault: VaultViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -25,7 +26,7 @@ class MainActivity : ComponentActivity() {
         }
         // Ignore les touches reçues quand une autre fenêtre recouvre l'application.
         window.decorView.filterTouchesWhenObscured = true
-        setContent { AppRoot(vm) }
+        setContent { AppRoot(vm, vault) }
     }
 
     override fun onStart() {

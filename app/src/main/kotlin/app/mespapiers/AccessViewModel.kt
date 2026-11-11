@@ -79,7 +79,7 @@ class AccessViewModel(app: Application) : AndroidViewModel(app) {
     fun onForeground() {
         if (busy) return
         val now = c.clock.elapsedMillis()
-        if (c.gate.isOpen && c.timers.shouldLock(now)) c.gate.lock() else c.timers.onForeground(now)
+        if (c.gate.isOpen && c.timers.shouldLock(now)) c.lockNow() else c.timers.onForeground(now)
         refresh()
     }
 
@@ -87,9 +87,12 @@ class AccessViewModel(app: Application) : AndroidViewModel(app) {
         // Pendant une dérivation, le portier est occupé : on ne l'interroge pas depuis le fil principal.
         if (busy) return
         try {
-            if (c.gate.isOpen && c.timers.shouldLock(c.clock.elapsedMillis())) c.gate.lock()
+            if (c.gate.isOpen && c.timers.shouldLock(c.clock.elapsedMillis())) c.lockNow()
             when (screen) {
-                Screen.Home -> if (!c.gate.isOpen) screen = Screen.Passphrase
+                Screen.Home -> if (!c.gate.isOpen) {
+                    c.vaultState.clear()
+                    screen = Screen.Passphrase
+                }
                 Screen.Totp -> {
                     totpRemainingMs = c.gate.totpRemainingMs()
                     if (!c.gate.isAwaitingTotp) {
@@ -142,9 +145,23 @@ class AccessViewModel(app: Application) : AndroidViewModel(app) {
                 c.createDeviceKeys()
                 val pending = c.gate.beginSetup(chars)
                 chars.fill('\u0000')
-                enrollment = pending
-                message = null
-                screen = Screen.Enroll(pending.otpAuthUri(), pending.manualKey())
+                if (SecondFactor.AUTOMATIC) {
+                    // Démo : la seconde étape est faite automatiquement (voir SecondFactor).
+                    SecondFactor.remember(c.appContext, pending.manualKey())
+                    val confirmed = SecondFactor.codes(c.appContext).any { c.gate.confirmSetup(pending, it) == null }
+                    message = null
+                    if (confirmed) {
+                        c.timers.onUnlocked(c.clock.elapsedMillis())
+                        screen = Screen.Home
+                    } else {
+                        pending.discard()
+                        screen = Screen.Intro
+                    }
+                } else {
+                    enrollment = pending
+                    message = null
+                    screen = Screen.Enroll(pending.otpAuthUri(), pending.manualKey())
+                }
             }
         }
     }
@@ -186,7 +203,17 @@ class AccessViewModel(app: Application) : AndroidViewModel(app) {
             val result = c.gate.submitPassphrase(chars)
             chars.fill('\u0000')
             when (result) {
-                PassphraseResult.Accepted -> {
+                PassphraseResult.Accepted -> if (SecondFactor.AUTOMATIC) {
+                    val opened = SecondFactor.codes(c.appContext).any { c.gate.submitTotp(it) == TotpResult.Opened }
+                    if (opened) {
+                        c.timers.onUnlocked(c.clock.elapsedMillis())
+                        message = null
+                        screen = Screen.Home
+                    } else {
+                        c.gate.cancelPending()
+                        message = UiMessage(R.string.demo_retry)
+                    }
+                } else {
                     message = null
                     totpRemainingMs = c.gate.totpRemainingMs()
                     screen = Screen.Totp
@@ -238,7 +265,7 @@ class AccessViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun lock() {
-        c.gate.lock()
+        c.lockNow()
         message = null
         refresh()
     }

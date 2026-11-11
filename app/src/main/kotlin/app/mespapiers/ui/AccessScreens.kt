@@ -62,6 +62,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.mespapiers.AccessViewModel
+import app.mespapiers.SecondFactor
+import app.mespapiers.VaultViewModel
+import androidx.compose.runtime.LaunchedEffect
 import app.mespapiers.R
 import app.mespapiers.Screen
 import app.mespapiers.UiMessage
@@ -110,7 +113,7 @@ fun MesPapiersTheme(content: @Composable () -> Unit) {
 }
 
 @Composable
-fun AppRoot(vm: AccessViewModel) {
+fun AppRoot(vm: AccessViewModel, vault: VaultViewModel) {
     MesPapiersTheme {
         Surface(
             Modifier
@@ -137,6 +140,7 @@ fun AppRoot(vm: AccessViewModel) {
                             .padding(horizontal = 20.dp, vertical = 24.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
+                        if (vm.screen != Screen.Home) LaunchedEffect(Unit) { vault.reset() }
                         when (val s = vm.screen) {
                             Screen.Loading -> BusyRow()
                             Screen.Intro -> IntroScreen(vm)
@@ -144,7 +148,7 @@ fun AppRoot(vm: AccessViewModel) {
                             is Screen.Enroll -> EnrollScreen(vm, s)
                             Screen.Passphrase -> PassphraseScreen(vm)
                             Screen.Totp -> TotpScreen(vm)
-                            Screen.Home -> HomeScreen(vm)
+                            Screen.Home -> VaultRoot(vault, onLock = { vm.lock() })
                             Screen.Unreadable -> UnreadableScreen()
                         }
                     }
@@ -155,7 +159,7 @@ fun AppRoot(vm: AccessViewModel) {
 }
 
 @Composable
-private fun DemoBanner() {
+internal fun DemoBanner() {
     Text(
         stringResource(R.string.demo_banner),
         Modifier.fillMaxWidth().background(Color(0xFFB3261E)).padding(4.dp),
@@ -168,7 +172,7 @@ private fun DemoBanner() {
 // ------------------------------------------------------------ briques communes
 
 @Composable
-private fun Brand() {
+internal fun Brand() {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
             stringResource(R.string.app_name),
@@ -181,12 +185,12 @@ private fun Brand() {
 }
 
 @Composable
-private fun Title(text: String) {
+internal fun Title(text: String) {
     Text(text, Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineSmall)
 }
 
 @Composable
-private fun InfoCard(title: String, body: String, warning: Boolean = false) {
+internal fun InfoCard(title: String, body: String, warning: Boolean = false) {
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
@@ -202,21 +206,21 @@ private fun InfoCard(title: String, body: String, warning: Boolean = false) {
 }
 
 @Composable
-private fun WideButton(text: String, enabled: Boolean = true, onClick: () -> Unit) {
+internal fun WideButton(text: String, enabled: Boolean = true, onClick: () -> Unit) {
     Button(onClick, Modifier.fillMaxWidth().heightIn(min = 52.dp), enabled = enabled, shape = RoundedCornerShape(16.dp)) {
         Text(text, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
     }
 }
 
 @Composable
-private fun WideOutlinedButton(text: String, enabled: Boolean = true, onClick: () -> Unit) {
+internal fun WideOutlinedButton(text: String, enabled: Boolean = true, onClick: () -> Unit) {
     OutlinedButton(onClick, Modifier.fillMaxWidth().heightIn(min = 52.dp), enabled = enabled, shape = RoundedCornerShape(16.dp)) {
         Text(text, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
     }
 }
 
 @Composable
-private fun BusyRow(text: String = stringResource(R.string.working)) {
+internal fun BusyRow(text: String = stringResource(R.string.working)) {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         CircularProgressIndicator()
         Text(text, Modifier.semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
@@ -225,7 +229,7 @@ private fun BusyRow(text: String = stringResource(R.string.working)) {
 
 /** Erreur ou information, annoncée par TalkBack dès qu'elle apparaît. */
 @Composable
-private fun MessageLine(message: UiMessage?) {
+internal fun MessageLine(message: UiMessage?) {
     if (message == null) return
     val text = if (message.arg != null) stringResource(message.res, message.arg) else stringResource(message.res)
     Text(
@@ -238,7 +242,7 @@ private fun MessageLine(message: UiMessage?) {
 
 /** Champ secret : pas de correction, pas de suggestion, pas de majuscule automatique. */
 @Composable
-private fun SecretField(value: String, onChange: (String) -> Unit, label: String, enabled: Boolean, imeAction: ImeAction, onDone: () -> Unit = {}) {
+internal fun SecretField(value: String, onChange: (String) -> Unit, label: String, enabled: Boolean, imeAction: ImeAction, onDone: () -> Unit = {}) {
     var visible by remember { mutableStateOf(false) }
     OutlinedTextField(
         value = value,
@@ -265,7 +269,7 @@ private fun SecretField(value: String, onChange: (String) -> Unit, label: String
 }
 
 @Composable
-private fun CodeField(value: String, onChange: (String) -> Unit, enabled: Boolean, onDone: () -> Unit) {
+internal fun CodeField(value: String, onChange: (String) -> Unit, enabled: Boolean, onDone: () -> Unit) {
     OutlinedTextField(
         value = value,
         onValueChange = { new -> onChange(new.filter { it.isDigit() }.take(6)) },
@@ -280,7 +284,7 @@ private fun CodeField(value: String, onChange: (String) -> Unit, enabled: Boolea
     )
 }
 
-private fun formatDuration(ms: Long): String {
+internal fun formatDuration(ms: Long): String {
     val total = (ms + 999) / 1000
     val h = total / 3600
     val m = (total % 3600) / 60
@@ -291,19 +295,23 @@ private fun formatDuration(ms: Long): String {
 // ------------------------------------------------------------ configuration
 
 @Composable
-private fun IntroScreen(vm: AccessViewModel) {
+internal fun IntroScreen(vm: AccessViewModel) {
     Brand()
     Title(stringResource(R.string.intro_title))
     Text(stringResource(R.string.intro_body), style = MaterialTheme.typography.bodyLarge)
     if (!vm.deviceSecure) InfoCard(stringResource(R.string.intro_no_lock_title), stringResource(R.string.intro_no_lock_body), warning = true)
-    InfoCard(stringResource(R.string.intro_two_steps_title), stringResource(R.string.intro_two_steps_body))
-    InfoCard(stringResource(R.string.intro_no_reset_title), stringResource(R.string.intro_no_reset_body))
-    InfoCard(stringResource(R.string.intro_same_device_title), stringResource(R.string.intro_same_device_body))
+    if (SecondFactor.AUTOMATIC) {
+        InfoCard(stringResource(R.string.demo_single_step_title), stringResource(R.string.demo_single_step_body), warning = true)
+    } else {
+        InfoCard(stringResource(R.string.intro_two_steps_title), stringResource(R.string.intro_two_steps_body))
+        InfoCard(stringResource(R.string.intro_no_reset_title), stringResource(R.string.intro_no_reset_body))
+        InfoCard(stringResource(R.string.intro_same_device_title), stringResource(R.string.intro_same_device_body))
+    }
     WideButton(stringResource(R.string.intro_start)) { vm.startSetup() }
 }
 
 @Composable
-private fun CreatePassphraseScreen(vm: AccessViewModel) {
+internal fun CreatePassphraseScreen(vm: AccessViewModel) {
     var passphrase by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
     Title(stringResource(R.string.create_title))
@@ -328,14 +336,14 @@ private fun CreatePassphraseScreen(vm: AccessViewModel) {
 }
 
 /** QR généré localement (ZXing), sans aucun service distant. */
-private fun qrBitmap(content: String, size: Int = 720): Bitmap {
+internal fun qrBitmap(content: String, size: Int = 720): Bitmap {
     val matrix = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, size, size, mapOf(EncodeHintType.MARGIN to 2))
     val pixels = IntArray(size * size) { i -> if (matrix.get(i % size, i / size)) 0xFF000000.toInt() else 0xFFFFFFFF.toInt() }
     return Bitmap.createBitmap(pixels, size, size, Bitmap.Config.ARGB_8888)
 }
 
 @Composable
-private fun EnrollScreen(vm: AccessViewModel, state: Screen.Enroll) {
+internal fun EnrollScreen(vm: AccessViewModel, state: Screen.Enroll) {
     val context = LocalContext.current
     var code by remember { mutableStateOf("") }
     val qr = remember(state.otpAuthUri) { qrBitmap(state.otpAuthUri).asImageBitmap() }
@@ -377,12 +385,12 @@ private fun EnrollScreen(vm: AccessViewModel, state: Screen.Enroll) {
 // ------------------------------------------------------------ connexion
 
 @Composable
-private fun PassphraseScreen(vm: AccessViewModel) {
+internal fun PassphraseScreen(vm: AccessViewModel) {
     var passphrase by remember { mutableStateOf("") }
     val waiting = vm.waitMs > 0
     Brand()
     Title(stringResource(R.string.login_title))
-    Text(stringResource(R.string.login_step1), style = MaterialTheme.typography.bodyLarge)
+    Text(stringResource(if (SecondFactor.AUTOMATIC) R.string.demo_login_step else R.string.login_step1), style = MaterialTheme.typography.bodyLarge)
     SecretField(passphrase, { passphrase = it }, stringResource(R.string.create_field), !vm.busy && !waiting, ImeAction.Done) {
         vm.submitPassphrase(passphrase)
         passphrase = ""
@@ -404,7 +412,7 @@ private fun PassphraseScreen(vm: AccessViewModel) {
 }
 
 @Composable
-private fun TotpScreen(vm: AccessViewModel) {
+internal fun TotpScreen(vm: AccessViewModel) {
     var code by remember { mutableStateOf("") }
     Brand()
     Title(stringResource(R.string.login_title))
@@ -425,17 +433,7 @@ private fun TotpScreen(vm: AccessViewModel) {
 }
 
 @Composable
-private fun UnreadableScreen() {
+internal fun UnreadableScreen() {
     Brand()
     InfoCard(stringResource(R.string.vault_unreadable_title), stringResource(R.string.vault_unreadable), warning = true)
-}
-
-// ------------------------------------------------------------ accueil provisoire
-
-@Composable
-private fun HomeScreen(vm: AccessViewModel) {
-    Brand()
-    Title(stringResource(R.string.home_open))
-    InfoCard(stringResource(R.string.app_name), stringResource(R.string.home_pending), warning = true)
-    WideOutlinedButton(stringResource(R.string.home_lock)) { vm.lock() }
 }

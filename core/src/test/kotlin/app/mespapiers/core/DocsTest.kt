@@ -22,6 +22,9 @@ import app.mespapiers.core.model.FieldType
 import app.mespapiers.core.model.FileFormat
 import app.mespapiers.core.model.Ids
 import app.mespapiers.core.model.Record
+import app.mespapiers.core.model.RecordVault
+import app.mespapiers.core.crypto.Aead
+import app.mespapiers.core.crypto.AeadException
 import app.mespapiers.core.model.Templates
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -85,6 +88,27 @@ class DocsTest {
             }
         }
         assertTrue(Ids.isValid(Ids.new()))
+    }
+
+    @Test
+    fun fiche_chiffree_pour_la_base_liee_a_son_identifiant() {
+        val dk = Aead.newKey()
+        val key = RecordVault.key(dk)
+        val a = Record(Ids.new(), Category.IDENTITY, "Passeport", fields = listOf(Field("number", FieldType.IDENTIFIER, "00AB12345", sensitive = true)))
+        val b = Record(Ids.new(), Category.BANK, "RIB")
+        val blobA = RecordVault.seal(key, a)
+        assertEquals(a, RecordVault.open(key, a.id, blobA))
+        val text = String(blobA, Charsets.ISO_8859_1)
+        assertFalse(text.contains("Passeport") || text.contains("00AB12345") || text.contains(a.id))
+        // Un enregistrement recopié sous l'identifiant d'une autre fiche est refusé.
+        for (bad in listOf({ RecordVault.open(key, b.id, blobA) }, { RecordVault.open(RecordVault.key(Aead.newKey()), a.id, blobA) })) {
+            try {
+                bad()
+                fail("enregistrement accepté à tort")
+            } catch (e: AeadException) {
+            }
+        }
+        assertFalse("la sous-clé n'est pas la clé de données", key.contentEquals(dk))
     }
 
     @Test

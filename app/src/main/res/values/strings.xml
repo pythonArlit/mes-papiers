@@ -74,10 +74,137 @@
     <string name="vault_unreadable_title">Coffre illisible</string>
     <string name="vault_unreadable">Le coffre de ce téléphone n’est plus lisible : sa clé de protection a disparu ou ses fichiers sont abîmés. Ta phrase secrète ne suffit plus. Réinstalle l’application puis restaure ta dernière archive avec ta phrase de récupération.</string>
 
-    <!-- Accueil provisoire -->
-    <string name="home_open">Coffre ouvert</string>
-    <string name="home_pending">Les fiches, les pièces jointes, les échéances et la sauvegarde ne sont pas encore disponibles dans cette version. N’y range aucun document réel.</string>
+    <!-- Variante de démonstration -->
+    <string name="demo_single_step_title">Démo : une seule étape</string>
+    <string name="demo_single_step_body">Dans cette version de démonstration, le code de l’application d’authentification n’est pas demandé : seule ta phrase secrète ouvre le coffre. La protection est donc réduite. N’y range aucun document réel.</string>
+    <string name="demo_login_step">Saisis ta phrase secrète</string>
+    <string name="demo_retry">Ouverture impossible pour l’instant. Réessaie dans quelques secondes.</string>
+
+    <string name="action_cancel">Annuler</string>
+    <string name="vault_operation_failed">L’opération n’a pas abouti. Le coffre s’est peut-être verrouillé : ouvre-le de nouveau et réessaie.</string>
+    <string name="copy_suffix">\u0020(copie)</string>
+
+    <!-- Accueil -->
+    <string name="home_add">Ajouter un document</string>
+    <string name="home_count_none">Aucun document pour l’instant</string>
+    <plurals name="home_count">
+        <item quantity="one">%1$d document</item>
+        <item quantity="many">%1$d documents</item>
+        <item quantity="other">%1$d documents</item>
+    </plurals>
+    <string name="home_empty_title">Ton coffre est vide</string>
+    <string name="home_empty_body">Commence par ajouter un document : une pièce d’identité, un diplôme, un RIB… Un titre et une catégorie suffisent.</string>
+    <string name="home_deadlines">Échéances des 30 prochains jours</string>
+    <string name="home_deadlines_none">Aucune échéance proche.</string>
+    <string name="home_favorites">Favoris</string>
+    <string name="home_favorites_none">Aucun favori. Ouvre un document pour l’ajouter aux favoris.</string>
+    <string name="home_all">Tous les documents</string>
     <string name="home_lock">Verrouiller</string>
+    <string name="home_unreadable_title">Documents illisibles</string>
+    <plurals name="home_unreadable">
+        <item quantity="one">%1$d document n’a pas pu être lu : son enregistrement est abîmé.</item>
+        <item quantity="many">%1$d documents n’ont pas pu être lus : leurs enregistrements sont abîmés.</item>
+        <item quantity="other">%1$d documents n’ont pas pu être lus : leurs enregistrements sont abîmés.</item>
+    </plurals>
+
+    <!-- Échéances -->
+    <plurals name="deadline_expired">
+        <item quantity="one">Expiré depuis %1$d jour</item>
+        <item quantity="many">Expiré depuis %1$d jours</item>
+        <item quantity="other">Expiré depuis %1$d jours</item>
+    </plurals>
+    <plurals name="deadline_soon">
+        <item quantity="one">Expire dans %1$d jour</item>
+        <item quantity="many">Expire dans %1$d jours</item>
+        <item quantity="other">Expire dans %1$d jours</item>
+    </plurals>
+    <string name="deadline_today">Expire aujourd’hui</string>
+    <string name="deadline_valid">Valable jusqu’au %1$s</string>
+
+    <!-- Liste -->
+    <string name="list_title">Tous les documents</string>
+    <string name="list_search">Rechercher (titre, catégorie, étiquette)</string>
+    <string name="list_all_categories">Toutes</string>
+    <string name="list_no_result_title">Aucun résultat</string>
+    <string name="list_no_result_body">Aucun document ne correspond à cette recherche. Essaie un autre mot ou une autre catégorie.</string>
+    <plurals name="list_results">
+        <item quantity="one">%1$d résultat</item>
+        <item quantity="many">%1$d résultats</item>
+        <item quantity="other">%1$d résultats</item>
+    </plurals>
+    <string name="list_truncated">Seuls les %1$d premiers sont affichés. Précise ta recherche pour voir les autres.</string>
+
+    <!-- Détail -->
+    <string name="detail_expired_title">Document expiré</string>
+    <string name="detail_deadline_title">Échéance</string>
+    <string name="detail_tags">Étiquettes : %1$s</string>
+    <string name="detail_no_field">Aucune information saisie pour ce document.</string>
+    <string name="detail_masked">•••••••• (masqué)</string>
+    <string name="detail_edit">Modifier</string>
+    <string name="detail_favorite">Ajouter aux favoris</string>
+    <string name="detail_unfavorite">Retirer des favoris</string>
+    <string name="detail_duplicate">Dupliquer</string>
+    <string name="detail_delete">Supprimer</string>
+    <string name="delete_title">Supprimer ce document ?</string>
+    <string name="delete_body">« %1$s » sera supprimé définitivement. Il n’y a pas de corbeille.</string>
+    <string name="delete_confirm">Supprimer définitivement</string>
+
+    <!-- Ajout et modification -->
+    <string name="pick_title">Quel type de document ?</string>
+    <string name="pick_body">Choisis une catégorie. Elle détermine les informations proposées.</string>
+    <string name="edit_new_title">Nouveau document</string>
+    <string name="edit_title">Modifier le document</string>
+    <string name="edit_hint">Seul le titre est obligatoire. Tout le reste peut être complété plus tard.</string>
+    <string name="edit_title_field">Titre</string>
+    <string name="edit_tags_field">Étiquettes</string>
+    <string name="edit_tags_hint">Sépare-les par des virgules.</string>
+    <string name="edit_date_placeholder">JJ/MM/AAAA</string>
+    <string name="edit_custom_section">Champs personnalisés</string>
+    <string name="edit_add_field">Ajouter un champ personnalisé</string>
+    <string name="edit_custom_label">Nom du champ</string>
+    <string name="edit_custom_value">Valeur</string>
+    <string name="edit_custom_sensitive">Information sensible (masquée par défaut)</string>
+    <string name="edit_remove_field">Retirer ce champ</string>
+    <string name="edit_save">Enregistrer</string>
+    <string name="edit_title_required">Donne un titre au document.</string>
+    <string name="edit_date_invalid">Une date n’est pas valide. Écris-la sous la forme JJ/MM/AAAA, par exemple 05/03/2031.</string>
+    <string name="edit_custom_label_required">Donne un nom à chaque champ personnalisé rempli.</string>
+    <string name="edit_custom_value_required">Remplis ou retire les champs personnalisés vides.</string>
+    <string name="type_text">Texte</string>
+    <string name="type_date">Date</string>
+    <string name="type_identifier">Identifiant</string>
+    <string name="warn_date">Date à écrire sous la forme JJ/MM/AAAA.</string>
+    <string name="warn_iban_format">Cela ne ressemble pas à un IBAN. Tu peux quand même l’enregistrer.</string>
+    <string name="warn_iban_checksum">La clé de contrôle de cet IBAN ne correspond pas. Vérifie la saisie ; tu peux quand même l’enregistrer.</string>
+    <string name="warn_rib">Longueur ou caractères inhabituels pour un RIB. Tu peux quand même l’enregistrer.</string>
+
+    <!-- Champs -->
+    <string name="field_type">Type de pièce</string>
+    <string name="field_holder">Titulaire</string>
+    <string name="field_number">Numéro</string>
+    <string name="field_issuer">Pays ou organisme émetteur</string>
+    <string name="field_issued_on">Date de délivrance</string>
+    <string name="field_expires_on">Date d’expiration</string>
+    <string name="field_title">Intitulé</string>
+    <string name="field_institution">Établissement</string>
+    <string name="field_obtained_on">Date d’obtention</string>
+    <string name="field_reference">Référence</string>
+    <string name="field_act_type">Type d’acte</string>
+    <string name="field_act_date">Date de l’acte</string>
+    <string name="field_label">Libellé</string>
+    <string name="field_address">Adresse</string>
+    <string name="field_city">Ville</string>
+    <string name="field_country">Pays</string>
+    <string name="field_extra">Complément</string>
+    <string name="field_valid_from">Valable à partir du</string>
+    <string name="field_valid_until">Valable jusqu’au</string>
+    <string name="field_bank">Banque</string>
+    <string name="field_account_number">Numéro de compte</string>
+    <string name="field_rib">RIB</string>
+    <string name="field_iban">IBAN</string>
+    <string name="field_bic">SWIFT / BIC</string>
+    <string name="field_contact">Contact</string>
+    <string name="field_other">Information</string>
 
     <!-- Notifications : toujours neutres, jamais de titre ni de catégorie. -->
     <string name="reminder_title">Mes Papiers</string>
