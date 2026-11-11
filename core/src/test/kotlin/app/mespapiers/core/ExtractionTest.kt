@@ -1,5 +1,7 @@
 package app.mespapiers.core
 
+import app.mespapiers.core.docs.Box
+import app.mespapiers.core.docs.DocumentCropper
 import app.mespapiers.core.docs.DocumentReader
 import app.mespapiers.core.docs.Extraction
 import app.mespapiers.core.docs.Mrz
@@ -199,5 +201,127 @@ class ExtractionTest {
         assertEquals("MAHAMADOU", e.holder)
         assertEquals(LocalDate.of(2032, 1, 11), e.expiresOn)
         assertEquals("", RowAssembler.assemble(emptyList()))
+    }
+
+    // ------------------------------------------------------------ carte bilingue sur deux colonnes
+
+    /**
+     * Mise en page d'une carte d'identité réelle signalée par un utilisateur : libellés
+     * bilingues, valeur sous le libellé, deux colonnes. Les données sont fictives.
+     */
+    private fun bilingualCard(): List<TextLine> {
+        fun line(text: String, left: Int, row: Int) = TextLine(text, left, 100 + row * 50, 136 + row * 50, left + text.length * 16)
+        return listOf(
+            line("REPUBLIQUE DU NIGER", 300, -2),
+            line("CARTE NATIONALE D'IDENTITE AES", 220, -1),
+            line("AES NATIONAL IDENTITY CARD", 260, 0),
+            line("NIU **********", 420, 1),
+            line("Numéro de la carte", 420, 2), line("N° extrait de Naiss", 900, 2),
+            line("000198101000755", 420, 3), line("604/JPD/30/01/1987", 900, 3),
+            line("Nom/Surname", 420, 4),
+            line("EXEMPLE DUPONT", 420, 5),
+            line("Prénoms/ GivenNames", 420, 6),
+            line("CAMILLE", 420, 7),
+            line("Date de naissance/ Date of Birth", 420, 8),
+            line("01/01/1981", 420, 9),
+            line("Lieu de naissance/ Place of Birth", 420, 10), line("Sexe", 1000, 10), line("Taille", 1200, 10),
+            line("VILLE-EXEMPLE/C.U. FICTIVE", 420, 11), line("M", 1000, 11), line("173", 1200, 11),
+            line("Téléphone", 420, 12),
+            line("90000000", 420, 13),
+            line("Profession", 420, 14), line("G.S.", 1000, 14),
+            line("GESTIONNAIRE", 420, 15), line("AB+", 1000, 15),
+        )
+    }
+
+    @Test
+    fun carte_bilingue_la_valeur_est_sous_le_libelle() {
+        val e = DocumentReader.read(bilingualCard(), today)
+        assertEquals(Category.IDENTITY, e.category)
+        assertEquals("Carte nationale d'identité", e.docType)
+        assertEquals("le prénom n'est pas le mot « GivenNames »", "CAMILLE EXEMPLE DUPONT", e.holder)
+        assertEquals("zéros initiaux conservés", "000198101000755", e.number)
+        assertEquals(LocalDate.of(1981, 1, 1), e.birthDate)
+        assertEquals("Niger", e.issuer)
+        assertNull("la date incluse dans le numéro d'extrait n'est pas une date du document", e.issuedOn)
+        assertNull("aucune date d'expiration sur ce recto", e.expiresOn)
+        val values = e.valuesFor(Category.IDENTITY)
+        assertEquals("CAMILLE EXEMPLE DUPONT", values["holder"])
+        assertEquals("000198101000755", values["number"])
+        assertFalse(values.containsKey("expires_on"))
+    }
+
+    @Test
+    fun carte_bilingue_lue_dans_le_desordre() {
+        val e = DocumentReader.read(bilingualCard().shuffled(java.util.Random(7)), today)
+        assertEquals("CAMILLE EXEMPLE DUPONT", e.holder)
+        assertEquals("000198101000755", e.number)
+    }
+
+    @Test
+    fun valeur_a_droite_du_libelle_sur_la_meme_ligne() {
+        val lines = listOf(
+            TextLine("PASSEPORT", 40, 20, 60, 400),
+            TextLine("Nom", 40, 100, 132, 110), TextLine("DUPONT", 300, 101, 133, 460),
+            TextLine("Prénoms", 40, 160, 192, 180), TextLine("Camille", 300, 161, 193, 450),
+            TextLine("Date d'expiration", 40, 220, 252, 330), TextLine("11/01/2032", 400, 221, 253, 600),
+        )
+        val e = DocumentReader.read(lines, today)
+        assertEquals("Camille DUPONT", e.holder)
+        assertEquals(LocalDate.of(2032, 1, 11), e.expiresOn)
+    }
+
+    // ------------------------------------------------------------ recadrage automatique
+
+    /** Image de [w] × [h] : fond uni, document rectangulaire avec une « photo » sombre et du « texte ». */
+    private fun scene(w: Int, h: Int, doc: Box, background: Int, paper: Int): IntArray {
+        val luma = IntArray(w * h) { background }
+        for (y in doc.top until doc.bottom) for (x in doc.left until doc.right) luma[y * w + x] = paper
+        // Photo d'identité sombre et lignes de texte : des « trous » dans le document.
+        for (y in doc.top + 10 until doc.top + 40) for (x in doc.left + 8 until doc.left + 30) luma[y * w + x] = 30
+        for (row in 0 until 4) for (x in doc.left + 40 until doc.right - 10 step 2) luma[(doc.top + 15 + row * 12) * w + x] = 20
+        return luma
+    }
+
+    @Test
+    fun recadrage_document_clair_sur_fond_sombre() {
+        val doc = Box(60, 40, 260, 170)
+        val crop = DocumentCropper.find(scene(320, 240, doc, background = 25, paper = 215), 320, 240)!!
+        for ((got, want) in listOf(crop.left to doc.left, crop.top to doc.top, crop.right to doc.right, crop.bottom to doc.bottom)) {
+            assertTrue("recadrage $crop pour $doc", kotlin.math.abs(got - want) <= 4)
+        }
+    }
+
+    @Test
+    fun recadrage_document_sombre_sur_fond_clair() {
+        val doc = Box(30, 50, 200, 200)
+        val crop = DocumentCropper.find(scene(320, 240, doc, background = 235, paper = 90), 320, 240)!!
+        assertTrue("$crop", kotlin.math.abs(crop.left - doc.left) <= 4 && kotlin.math.abs(crop.right - doc.right) <= 4)
+    }
+
+    @Test
+    fun recadrage_fond_de_meme_teinte_repli_sur_le_texte() {
+        // Feuille blanche sur table blanche : aucune zone ne se détache, on cadre le texte avec une marge.
+        val luma = IntArray(320 * 240) { 230 }
+        val text = listOf(Box(100, 80, 220, 90), Box(100, 100, 200, 110), Box(100, 120, 230, 130))
+        val crop = DocumentCropper.find(luma, 320, 240, text)!!
+        assertTrue("$crop", crop.left < 100 && crop.right > 230 && crop.top < 80 && crop.bottom > 130)
+        assertTrue("$crop", crop.left >= 80 && crop.right <= 250 && crop.area < 320L * 240 / 2)
+    }
+
+    @Test
+    fun recadrage_refuse_une_zone_qui_ne_contient_pas_le_texte() {
+        // Une tache claire dans un coin n'est pas le document si le texte est ailleurs.
+        val luma = scene(320, 240, Box(5, 5, 120, 110), background = 25, paper = 215)
+        val text = listOf(Box(180, 150, 300, 160), Box(180, 170, 290, 180), Box(180, 190, 300, 200))
+        val crop = DocumentCropper.find(luma, 320, 240, text)!!
+        assertTrue("le texte reste dans le cadre : $crop", crop.left <= 180 && crop.right >= 300 && crop.top <= 150 && crop.bottom >= 200)
+    }
+
+    @Test
+    fun rien_a_rogner() {
+        // Document plein cadre, ou image unie sans texte : on garde l'image entière.
+        assertNull(DocumentCropper.find(scene(320, 240, Box(2, 2, 318, 238), 25, 215), 320, 240))
+        assertNull(DocumentCropper.find(IntArray(320 * 240) { 128 }, 320, 240))
+        assertNull(DocumentCropper.find(IntArray(320 * 240) { 128 }, 320, 240, listOf(Box(10, 10, 300, 20))))
     }
 }

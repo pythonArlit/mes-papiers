@@ -186,9 +186,40 @@ object Mrz {
     }
 }
 
+/** Ligne de texte reconnue, avec sa position dans l'image (pixels, origine en haut à gauche). */
+class TextLine(val text: String, val left: Int, val top: Int, val bottom: Int, val right: Int = left + text.length * 12)
+
 /**
- * Lecture d'un texte reconnu par OCR : nature du document, dates, numéros, titulaire,
- * coordonnées bancaires. Ce sont des heuristiques : elles proposent, l'utilisateur dispose.
+ * Remet les lignes reconnues dans l'ordre de lecture. Les moteurs d'OCR rendent souvent
+ * un libellé et sa valeur dans deux blocs distincts : on regroupe ce qui est à la même
+ * hauteur sur une seule ligne, de gauche à droite.
+ */
+object RowAssembler {
+    fun assemble(lines: List<TextLine>): String {
+        if (lines.isEmpty()) return ""
+        val heights = lines.map { (it.bottom - it.top).coerceAtLeast(1) }.sorted()
+        val tolerance = heights[heights.size / 2] * 0.6
+        val sorted = lines.sortedBy { (it.top + it.bottom) / 2.0 }
+        val rows = ArrayList<MutableList<TextLine>>()
+        var rowCenter = 0.0
+        for (line in sorted) {
+            val center = (line.top + line.bottom) / 2.0
+            if (rows.isNotEmpty() && center - rowCenter <= tolerance) {
+                rows.last() += line
+            } else {
+                rows += mutableListOf(line)
+                rowCenter = center
+            }
+        }
+        return rows.joinToString("\n") { row -> row.sortedBy { it.left }.joinToString("  ") { it.text } }
+    }
+}
+
+/**
+ * Lecture d'un document reconnu par OCR : nature du document, dates, numéros, titulaire,
+ * coordonnées bancaires. La position des lignes sert à rattacher chaque valeur à son
+ * libellé, qu'elle soit à sa droite ou en dessous (cartes bilingues, mise en colonnes).
+ * Ce sont des heuristiques : elles proposent, l'utilisateur dispose.
  */
 object DocumentReader {
     private class Kind(val keyword: String, val category: Category, val label: String)
@@ -197,6 +228,7 @@ object DocumentReader {
     private val KINDS = listOf(
         Kind("releve d identite bancaire", Category.BANK, "Relevé d'identité bancaire"),
         Kind("carte nationale d identite", Category.IDENTITY, "Carte nationale d'identité"),
+        Kind("national identity card", Category.IDENTITY, "Carte nationale d'identité"),
         Kind("carte d identite", Category.IDENTITY, "Carte d'identité"),
         Kind("identity card", Category.IDENTITY, "Carte d'identité"),
         Kind("permis de conduire", Category.IDENTITY, "Permis de conduire"),
@@ -232,8 +264,9 @@ object DocumentReader {
         Kind("facture", Category.ADDRESS, "Facture"),
     )
 
-    private val COUNTRIES = mapOf(
-        "NER" to "Niger", "NGA" to "Nigeria", "BEN" to "Bénin", "BFA" to "Burkina Faso", "MLI" to "Mali",
+    // Code ICAO → nom. L'ordre compte pour la recherche dans le texte (« nigeria » avant « niger »).
+    private val COUNTRIES = linkedMapOf(
+        "NGA" to "Nigeria", "NER" to "Niger", "BEN" to "Bénin", "BFA" to "Burkina Faso", "MLI" to "Mali",
         "TCD" to "Tchad", "DZA" to "Algérie", "LBY" to "Libye", "SEN" to "Sénégal", "CIV" to "Côte d'Ivoire",
         "TGO" to "Togo", "GHA" to "Ghana", "CMR" to "Cameroun", "MAR" to "Maroc", "TUN" to "Tunisie",
         "MRT" to "Mauritanie", "GIN" to "Guinée", "FRA" to "France", "DEU" to "Allemagne", "D" to "Allemagne",
@@ -249,10 +282,13 @@ object DocumentReader {
         listOf("novembre", "nov", "november"), listOf("decembre", "dec", "december"),
     )
 
-    private val NUMERIC_DATE = Regex("(?<!\\d)(\\d{1,2})\\s?[./-]\\s?(\\d{1,2})\\s?[./-]\\s?(\\d{4})(?!\\d)")
+    // Une date collée à une référence (« 604/JPD/30/01/1987 ») n'est pas une date du document.
+    private val NUMERIC_DATE = Regex("(?<![\\d/.\\-])(\\d{1,2})\\s?[./-]\\s?(\\d{1,2})\\s?[./-]\\s?(\\d{4})(?![\\d/])")
     private val TEXT_DATE = Regex("(?<!\\d)(\\d{1,2})(?:er)?\\s+([a-z]{3,9})\\.?\\s+(\\d{4})(?!\\d)")
+
     // Le libellé est insensible à la casse ; la valeur n'est faite que de majuscules et de chiffres.
     private val NUMBER = Regex("(?:\\bN\\s?[°º]\\s?|\\b[Nn][Oo]\\b\\.?|\\b(?i:num[ée]ro)\\b|\\b(?i:number)\\b)\\s*[:.]?\\s*([A-Z0-9]+(?:[ /-][A-Z0-9]+){0,3})")
+    private val NUMBER_VALUE = Regex("^[A-Z0-9][A-Z0-9/ .\\-]{2,29}$")
     private val IBAN = Regex("[A-Z]{2}\\d{2}(?: ?[A-Z0-9]){11,30}")
     private val BIC = Regex("(?:BIC|SWIFT)[^A-Z0-9]{0,12}([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)(?![A-Z0-9])")
 
@@ -260,9 +296,34 @@ object DocumentReader {
     private val ISSUED_WORDS = listOf("delivr", "issue", "emis", "etabli", "fait a", "fait le")
     private val BIRTH_WORDS = listOf(" ne le", " nee le", " ne e le", "naissance", "birth", "born")
     private val OBTAINED_WORDS = listOf("session", "obtenu", "soutenu", "admis")
+    private val ALL_WORDS = EXPIRY_WORDS + ISSUED_WORDS + BIRTH_WORDS + OBTAINED_WORDS
+
+    /**
+     * Libellé d'un champ, en français et en anglais.
+     * @param primary mots par lesquels la ligne de libellé commence.
+     * @param vocabulary mots qui font partie du libellé (et jamais de la valeur).
+     */
+    private class Label(val primary: Set<String>, vocabulary: Set<String>) {
+        val vocabulary = primary + vocabulary
+    }
+
+    private val SURNAME = Label(setOf("nom", "noms", "surname", "name"), setOf("de", "famille", "family", "last", "et", "prenom", "prenoms", "s"))
+    private val GIVEN = Label(setOf("prenom", "prenoms", "given", "givenname", "givennames", "first", "forename", "forenames"), setOf("name", "names", "s"))
+    private val NUMBER_LABEL = Label(
+        setOf("numero", "n", "no", "number", "card", "id"),
+        setOf("de", "la", "du", "d", "of", "the", "carte", "piece", "passeport", "passport", "document", "identite", "identity", "national", "nationale", "cni", "nni", "nin"),
+    )
+    private val SPECIFIC_NUMBER = setOf("carte", "card", "piece", "passeport", "passport", "document", "cni", "nni", "nin")
+    private val ANY_LABEL_START = SURNAME.primary + GIVEN.primary + NUMBER_LABEL.primary +
+        setOf(
+            "date", "lieu", "place", "sexe", "sex", "taille", "height", "profession", "telephone", "nationalite", "nationality",
+            "adresse", "address", "signature", "expire", "expiration", "delivre", "delivree", "valable", "ne", "nee",
+        )
 
     /** Minuscules, sans accents, ponctuation réduite à des espaces. */
     private fun flat(s: String): String = TextNormalizer.normalize(s).replace(Regex("[^a-z0-9]+"), " ").trim()
+
+    private fun words(s: String): List<String> = flat(s).split(' ').filter { it.isNotEmpty() }
 
     private fun safeDate(year: Int, month: Int, day: Int): LocalDate? =
         if (year !in 1900..2100) null else try {
@@ -271,50 +332,99 @@ object DocumentReader {
             null
         }
 
-    private class Found(val date: LocalDate, val context: String)
+    // ------------------------------------------------------------ géométrie
 
-    private val ALL_WORDS = EXPIRY_WORDS + ISSUED_WORDS + BIRTH_WORDS + OBTAINED_WORDS
+    private fun height(l: TextLine) = (l.bottom - l.top).coerceAtLeast(1)
 
-    /** Contexte d'une date : ce qui la précède sur sa ligne ; à défaut de libellé, la ligne d'avant aussi. */
-    private fun contextOf(previous: String?, prefix: String): String {
-        val same = " " + flat(prefix)
-        return if (ALL_WORDS.any { same.contains(it) }) same else " " + flat((previous ?: "") + " " + prefix)
+    private fun related(a: TextLine, b: TextLine): Boolean =
+        minOf(a.right, b.right) - maxOf(a.left, b.left) > 0 || kotlin.math.abs(a.left - b.left) < 2 * height(a)
+
+    /** Ligne située juste sous [label], dans la même colonne. */
+    private fun below(label: TextLine, lines: List<TextLine>): TextLine? {
+        val h = height(label)
+        return lines.filter { it !== label && it.top >= label.top + h / 2 && it.top - label.bottom <= 2.5 * h && related(label, it) }
+            .minByOrNull { (it.top - label.bottom).coerceAtLeast(0) * 4 + kotlin.math.abs(it.left - label.left) }
     }
 
-    private fun dates(lines: List<String>): List<Found> {
-        val out = ArrayList<Found>()
-        lines.forEachIndexed { i, line ->
-            val previous = lines.getOrNull(i - 1)
-            for (m in NUMERIC_DATE.findAll(line)) {
-                safeDate(m.groupValues[3].toInt(), m.groupValues[2].toInt(), m.groupValues[1].toInt())
-                    ?.let { out += Found(it, contextOf(previous, line.substring(0, m.range.first))) }
+    /** Ligne située juste au-dessus de [value], dans la même colonne. */
+    private fun above(value: TextLine, lines: List<TextLine>): TextLine? {
+        val h = height(value)
+        return lines.filter { it !== value && it.bottom <= value.top + h / 2 && value.top - it.bottom <= 2.5 * h && related(value, it) }
+            .minByOrNull { (value.top - it.bottom).coerceAtLeast(0) * 4 + kotlin.math.abs(it.left - value.left) }
+    }
+
+    private fun sameRow(a: TextLine, b: TextLine): Boolean =
+        kotlin.math.abs((a.top + a.bottom) - (b.top + b.bottom)) / 2.0 <= 0.6 * height(a)
+
+    /** Ligne située à droite de [label], à la même hauteur. */
+    private fun rightOf(label: TextLine, lines: List<TextLine>): TextLine? =
+        lines.filter { it !== label && sameRow(label, it) && it.left > label.left && it.left - label.right <= 12 * height(label) }.minByOrNull { it.left }
+
+    /** Ligne située à gauche de [value], à la même hauteur. */
+    private fun leftOf(value: TextLine, lines: List<TextLine>): TextLine? =
+        lines.filter { it !== value && sameRow(value, it) && it.left < value.left }.maxByOrNull { it.left }
+
+    private fun startsLikeLabel(text: String): Boolean = words(text).firstOrNull() in ANY_LABEL_START
+
+    /**
+     * Valeurs candidates pour un champ : pour chaque ligne qui commence par son libellé, ce
+     * qui suit le libellé sur la ligne, sinon la ligne à sa droite, sinon celle du dessous.
+     * Le second élément dit si le libellé contenait l'un des mots de [specific].
+     */
+    private fun candidates(lines: List<TextLine>, label: Label, valid: (String) -> Boolean, specific: Set<String> = emptySet()): List<Pair<String, Boolean>> {
+        val out = ArrayList<Pair<String, Boolean>>()
+        val token = Regex("[^\\s/:]+")
+        fun clean(v: String) = v.trim(' ', ':', '.', '-')
+        for (line in lines) {
+            val all = words(line.text)
+            if (all.firstOrNull() !in label.primary) continue
+            val tokens = token.findAll(line.text).toList()
+            val rest = tokens.firstOrNull { t -> !words(t.value).all { it in label.vocabulary } }
+            val value = if (rest != null) {
+                // Le libellé est suivi d'autre chose sur sa ligne : c'est la valeur, ou ce n'est pas notre libellé.
+                clean(line.text.substring(rest.range.first)).takeIf(valid)
+            } else {
+                listOfNotNull(rightOf(line, lines), below(line, lines)).map { clean(it.text) }.firstOrNull { !startsLikeLabel(it) && valid(it) }
             }
-            val lower = TextNormalizer.normalize(line)
-            for (m in TEXT_DATE.findAll(lower)) {
-                val month = MONTHS.indexOfFirst { names -> m.groupValues[2] in names } + 1
-                if (month > 0) {
-                    safeDate(m.groupValues[3].toInt(), month, m.groupValues[1].toInt())
-                        ?.let { out += Found(it, contextOf(previous, lower.substring(0, m.range.first))) }
-                }
-            }
+            if (value != null) out += value to all.any { it in specific }
         }
         return out
     }
 
-    private fun valueAfterLabel(lines: List<String>, labels: List<String>): String? {
-        lines.forEachIndexed { i, line ->
-            val f = flat(line)
-            val label = labels.firstOrNull { f == it || f.startsWith("$it ") } ?: return@forEachIndexed
-            // Valeur sur la même ligne (après « : » ou après le libellé), sinon sur la ligne suivante.
-            val same = line.substringAfter(':', "").trim().ifEmpty {
-                val words = line.trim().split(Regex("\\s+"))
-                words.drop(label.split(" ").size).joinToString(" ").trim()
+    private fun isName(v: String) = v.length in 2..60 && v.none { it.isDigit() } && v.count { it.isLetter() } >= v.length / 2
+
+    private fun isNumber(v: String) = NUMBER_VALUE.matches(v) && v.count { it.isDigit() } >= 3
+
+    // ------------------------------------------------------------ dates
+
+    private class Found(val date: LocalDate, val context: String)
+
+    /** Contexte d'une date : ce qui la précède sur sa ligne ; à défaut de libellé, la ligne du dessus. */
+    private fun contextOf(line: TextLine, prefix: String, lines: List<TextLine>): String {
+        val same = " " + flat(prefix)
+        if (ALL_WORDS.any { same.contains(it) }) return same
+        val left = " " + flat(leftOf(line, lines)?.text ?: "")
+        if (ALL_WORDS.any { left.contains(it) }) return left
+        return " " + flat((above(line, lines)?.text ?: "") + " " + prefix)
+    }
+
+    private fun dates(lines: List<TextLine>): List<Found> {
+        val out = ArrayList<Found>()
+        for (line in lines) {
+            for (m in NUMERIC_DATE.findAll(line.text)) {
+                safeDate(m.groupValues[3].toInt(), m.groupValues[2].toInt(), m.groupValues[1].toInt())
+                    ?.let { out += Found(it, contextOf(line, line.text.substring(0, m.range.first), lines)) }
             }
-            val candidate = same.ifEmpty { lines.getOrNull(i + 1)?.trim().orEmpty() }
-            val cleaned = candidate.trim(' ', ':', '.', '-')
-            if (cleaned.length in 2..60 && cleaned.count { it.isLetter() } >= cleaned.length / 2 && cleaned.none { it.isDigit() }) return cleaned
+            val lower = TextNormalizer.normalize(line.text)
+            for (m in TEXT_DATE.findAll(lower)) {
+                val month = MONTHS.indexOfFirst { names -> m.groupValues[2] in names } + 1
+                if (month > 0) {
+                    safeDate(m.groupValues[3].toInt(), month, m.groupValues[1].toInt())
+                        ?.let { out += Found(it, contextOf(line, lower.substring(0, m.range.first), lines)) }
+                }
+            }
         }
-        return null
+        return out
     }
 
     private fun groupByFour(s: String) = s.chunked(4).joinToString(" ")
@@ -331,12 +441,20 @@ object DocumentReader {
         return null
     }
 
+    /** Lecture d'un texte seul (sans positions) : chaque ligne est supposée sous la précédente. */
     fun read(text: String, today: LocalDate): Extraction {
         val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
+            .mapIndexed { i, t -> TextLine(t, 0, i * 40, i * 40 + 30, t.length * 12 + 12) }
+        return read(lines, today)
+    }
+
+    fun read(recognized: List<TextLine>, today: LocalDate): Extraction {
+        val lines = recognized.filter { it.text.isNotBlank() }.sortedWith(compareBy({ it.top }, { it.left }))
         if (lines.isEmpty()) return Extraction()
-        val whole = flat(lines.joinToString(" "))
-        val kind = KINDS.firstOrNull { (" $whole ").contains(" ${it.keyword} ") }
-        val mrz = Mrz.find(lines, today.year)
+        val rows = RowAssembler.assemble(lines).lines()
+        val whole = " " + flat(rows.joinToString(" ")) + " "
+        val kind = KINDS.firstOrNull { whole.contains(" ${it.keyword} ") }
+        val mrz = Mrz.find(rows, today.year) ?: Mrz.find(lines.map { it.text }, today.year)
 
         val found = dates(lines)
         fun labelled(words: List<String>) = found.firstOrNull { f -> words.any { f.context.contains(it) } }?.date
@@ -350,25 +468,33 @@ object DocumentReader {
             expires = found.map { it.date }.filter { it.isAfter(today) }.maxOrNull()
         }
 
-        val iban = findIban(lines.joinToString("\n"))
-        val bic = BIC.find(lines.joinToString("\n").uppercase())?.groupValues?.get(1)
-        val number = lines.firstNotNullOfOrNull { line ->
-            NUMBER.find(line)?.groupValues?.get(1)?.let { raw ->
-                // On écarte les mots sans chiffre accrochés à la fin (début du libellé suivant).
-                raw.split(' ').dropLastWhile { t -> t.none { it.isDigit() } }.joinToString(" ")
-            }?.takeIf { v -> v.count { it.isDigit() } >= 3 }
-        }
-        val surname = valueAfterLabel(lines, listOf("nom", "noms", "nom de famille", "surname", "name"))
-        val given = valueAfterLabel(lines, listOf("prenom", "prenoms", "prenom s", "given names", "given name"))
+        val joined = rows.joinToString("\n")
+        val iban = findIban(joined)
+        val bic = BIC.find(joined.uppercase())?.groupValues?.get(1)
+
+        val numbers = candidates(lines, NUMBER_LABEL, ::isNumber, SPECIFIC_NUMBER)
+        val number = (numbers.firstOrNull { it.second } ?: numbers.firstOrNull())?.first
+            ?: lines.firstNotNullOfOrNull { line ->
+                NUMBER.find(line.text)?.groupValues?.get(1)?.let { raw ->
+                    // On écarte les mots sans chiffre accrochés à la fin (début du libellé suivant).
+                    raw.split(' ').dropLastWhile { t -> t.none { it.isDigit() } }.joinToString(" ")
+                }?.takeIf { v -> v.count { it.isDigit() } >= 3 }
+            }
+
+        val surname = candidates(lines, SURNAME, ::isName).firstOrNull()?.first
+        val given = candidates(lines, GIVEN, ::isName).firstOrNull()?.first
         val holder = listOfNotNull(given, surname).joinToString(" ").ifEmpty { null }
-        val institution = lines.firstOrNull { l -> flat(l).let { f -> listOf("universite", "institut", "ecole", "lycee", "college", "faculte").any { f.contains(it) } } }
-        val bank = lines.firstOrNull { l -> flat(l).let { f -> (f.contains("banque") || f.contains("bank")) && !f.contains("identite bancaire") && f.length <= 60 } }
+        val institution = lines.map { it.text }.firstOrNull { l -> flat(l).let { f -> listOf("universite", "institut", "ecole", "lycee", "college", "faculte").any { f.contains(it) } } }
+        val bank = lines.map { it.text }.firstOrNull { l -> flat(l).let { f -> (f.contains("banque") || f.contains("bank")) && !f.contains("identite bancaire") && f.length <= 60 } }
+        // Pays émetteur d'une pièce d'identité, quand il est écrit en toutes lettres.
+        val issuer = if (category == Category.IDENTITY) COUNTRIES.values.firstOrNull { whole.contains(" ${flat(it)} ") } else null
 
         val base = Extraction(
             category = category ?: if (iban != null) Category.BANK else null,
             docType = kind?.label,
             holder = holder,
             number = number,
+            issuer = issuer,
             issuedOn = issued,
             expiresOn = expires,
             birthDate = birth,
@@ -390,7 +516,7 @@ object DocumentReader {
             docType = mrzType,
             holder = listOf(mrz.givenNames, mrz.surname).filter { it.isNotEmpty() }.joinToString(" ").ifEmpty { base.holder },
             number = mrz.number.ifEmpty { base.number },
-            issuer = COUNTRIES[mrz.issuer] ?: mrz.issuer.ifEmpty { null },
+            issuer = COUNTRIES[mrz.issuer] ?: mrz.issuer.ifEmpty { base.issuer },
             expiresOn = mrz.expiry ?: base.expiresOn,
             birthDate = mrz.birth ?: base.birthDate,
             issuedOn = base.issuedOn?.takeIf { it != mrz.expiry && it != mrz.birth },
@@ -399,31 +525,131 @@ object DocumentReader {
     }
 }
 
-/** Ligne de texte reconnue, avec sa position dans l'image. */
-class TextLine(val text: String, val left: Int, val top: Int, val bottom: Int)
+/** Rectangle en pixels, bords droit et bas exclus. */
+data class Box(val left: Int, val top: Int, val right: Int, val bottom: Int) {
+    val width: Int get() = right - left
+    val height: Int get() = bottom - top
+    val area: Long get() = width.toLong() * height
+}
 
 /**
- * Remet les lignes reconnues dans l'ordre de lecture. Les moteurs d'OCR rendent souvent
- * un libellé et sa valeur dans deux blocs distincts : on regroupe ce qui est à la même
- * hauteur sur une seule ligne, de gauche à droite.
+ * Recadrage automatique : trouve le rectangle du document dans la photo pour en retirer
+ * l'arrière-plan. Travaille sur une image réduite en niveaux de gris.
+ *
+ * 1. Seuil automatique (Otsu), puis plus grande zone d'un seul tenant, claire sur fond
+ *    sombre ou l'inverse. Elle est retenue si elle ressemble à un document : ni trop
+ *    petite, ni toute l'image, assez pleine, et contenant l'essentiel du texte reconnu.
+ * 2. À défaut (fond de même teinte que le document), le rectangle qui englobe le texte,
+ *    avec une marge.
+ *
+ * Le recadrage est droit : il ne corrige pas la perspective d'une photo prise de biais.
  */
-object RowAssembler {
-    fun assemble(lines: List<TextLine>): String {
-        if (lines.isEmpty()) return ""
-        val heights = lines.map { (it.bottom - it.top).coerceAtLeast(1) }.sorted()
-        val tolerance = heights[heights.size / 2] * 0.6
-        val sorted = lines.sortedBy { (it.top + it.bottom) / 2.0 }
-        val rows = ArrayList<MutableList<TextLine>>()
-        var rowCenter = 0.0
-        for (line in sorted) {
-            val center = (line.top + line.bottom) / 2.0
-            if (rows.isNotEmpty() && center - rowCenter <= tolerance) {
-                rows.last() += line
-            } else {
-                rows += mutableListOf(line)
-                rowCenter = center
+object DocumentCropper {
+    private const val MIN_AREA = 0.10
+    private const val MAX_AREA = 0.92
+    private const val MIN_FILL = 0.55
+    private const val MIN_TEXT_INSIDE = 0.8
+
+    /**
+     * @param luma luminance de chaque pixel (0 à 255), ligne par ligne, [width] × [height].
+     * @param text rectangles du texte reconnu, dans les mêmes coordonnées.
+     * @return le rectangle à garder, ou null s'il n'y a rien à rogner.
+     */
+    fun find(luma: IntArray, width: Int, height: Int, text: List<Box> = emptyList()): Box? {
+        require(luma.size == width * height && width > 0 && height > 0)
+        val total = width.toLong() * height
+        val threshold = otsu(luma)
+        val candidates = listOf(true, false).mapNotNull { bright -> largest(luma, width, height, threshold, bright) }
+            .filter { (box, pixels) ->
+                box.area >= MIN_AREA * total && box.area <= MAX_AREA * total &&
+                    pixels >= MIN_FILL * box.area && textInside(box, text) >= MIN_TEXT_INSIDE
+            }
+        val best = candidates.maxByOrNull { (box, pixels) -> pixels.toDouble() / box.area }?.first
+        val margin = maxOf(1, minOf(width, height) / 80)
+        val crop = when {
+            best != null -> expand(best, margin, margin, width, height)
+            text.size >= 3 -> {
+                val union = Box(text.minOf { it.left }, text.minOf { it.top }, text.maxOf { it.right }, text.maxOf { it.bottom })
+                expand(union, maxOf(margin, union.width / 12), maxOf(margin, union.height / 8), width, height)
+            }
+            else -> return null
+        }
+        return crop.takeIf { it.area < 0.95 * total && it.width > 8 && it.height > 8 }
+    }
+
+    private fun expand(b: Box, dx: Int, dy: Int, width: Int, height: Int) =
+        Box((b.left - dx).coerceAtLeast(0), (b.top - dy).coerceAtLeast(0), (b.right + dx).coerceAtMost(width), (b.bottom + dy).coerceAtMost(height))
+
+    private fun textInside(box: Box, text: List<Box>): Double {
+        if (text.isEmpty()) return 1.0
+        val inside = text.count { t ->
+            val cx = (t.left + t.right) / 2
+            val cy = (t.top + t.bottom) / 2
+            cx >= box.left && cx < box.right && cy >= box.top && cy < box.bottom
+        }
+        return inside.toDouble() / text.size
+    }
+
+    /** Seuil qui sépare au mieux deux populations de luminance. */
+    internal fun otsu(luma: IntArray): Int {
+        val hist = IntArray(256)
+        for (v in luma) hist[v.coerceIn(0, 255)]++
+        val total = luma.size.toDouble()
+        var sumAll = 0.0
+        for (i in 0..255) sumAll += i * hist[i].toDouble()
+        var sumBack = 0.0
+        var weightBack = 0.0
+        var best = 127
+        var bestVariance = -1.0
+        for (t in 0..255) {
+            weightBack += hist[t]
+            if (weightBack == 0.0) continue
+            val weightFore = total - weightBack
+            if (weightFore == 0.0) break
+            sumBack += t * hist[t].toDouble()
+            val meanBack = sumBack / weightBack
+            val meanFore = (sumAll - sumBack) / weightFore
+            val variance = weightBack * weightFore * (meanBack - meanFore) * (meanBack - meanFore)
+            if (variance > bestVariance) {
+                bestVariance = variance
+                best = t
             }
         }
-        return rows.joinToString("\n") { row -> row.sortedBy { it.left }.joinToString("  ") { it.text } }
+        return best
+    }
+
+    /** Plus grande zone d'un seul tenant du côté clair (ou sombre) du seuil : son rectangle et son nombre de pixels. */
+    private fun largest(luma: IntArray, width: Int, height: Int, threshold: Int, bright: Boolean): Pair<Box, Int>? {
+        val visited = BooleanArray(luma.size)
+        val queue = IntArray(luma.size)
+        var best: Pair<Box, Int>? = null
+        fun inMask(i: Int) = (luma[i] > threshold) == bright
+        for (start in luma.indices) {
+            if (visited[start] || !inMask(start)) continue
+            var head = 0
+            var tail = 0
+            queue[tail++] = start
+            visited[start] = true
+            var minX = width
+            var maxX = 0
+            var minY = height
+            var maxY = 0
+            while (head < tail) {
+                val i = queue[head++]
+                val x = i % width
+                val y = i / width
+                if (x < minX) minX = x
+                if (x > maxX) maxX = x
+                if (y < minY) minY = y
+                if (y > maxY) maxY = y
+                if (x > 0 && !visited[i - 1] && inMask(i - 1)) { visited[i - 1] = true; queue[tail++] = i - 1 }
+                if (x < width - 1 && !visited[i + 1] && inMask(i + 1)) { visited[i + 1] = true; queue[tail++] = i + 1 }
+                if (y > 0 && !visited[i - width] && inMask(i - width)) { visited[i - width] = true; queue[tail++] = i - width }
+                if (y < height - 1 && !visited[i + width] && inMask(i + width)) { visited[i + width] = true; queue[tail++] = i + width }
+            }
+            val previous = best
+            if (previous == null || tail > previous.second) best = Box(minX, minY, maxX + 1, maxY + 1) to tail
+        }
+        return best
     }
 }

@@ -109,7 +109,7 @@
 
     <!-- Scan et lecture automatique -->
     <string name="scan_action">Scanner un document</string>
-    <string name="scan_pitch">Prends le document en photo ou choisis un fichier : Mes Papiers le lit sur ton téléphone et prépare la fiche. Tu vérifies, tu corriges, tu enregistres.</string>
+    <string name="scan_pitch">Prends le document en photo ou choisis un fichier : Mes Papiers le redresse, le recadre, le lit sur ton téléphone et prépare la fiche. Tu vérifies, tu corriges, tu enregistres.</string>
     <string name="scan_manual">Saisir à la main, sans scanner</string>
     <string name="scan_source_hint">Pose le document à plat, bien éclairé, et cadre-le entièrement.</string>
     <string name="scan_from_file">Choisir une photo ou un PDF</string>

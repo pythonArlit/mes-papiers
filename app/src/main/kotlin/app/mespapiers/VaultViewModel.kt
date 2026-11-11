@@ -35,6 +35,7 @@ import app.mespapiers.core.util.wipe
 import app.mespapiers.data.NoSpaceException
 import app.mespapiers.platform.ImageRenderer
 import app.mespapiers.platform.PdfSession
+import app.mespapiers.platform.ScanProcessor
 import app.mespapiers.platform.TextReader
 import app.mespapiers.platform.Thumbnails
 import kotlinx.coroutines.Dispatchers
@@ -625,17 +626,33 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                         val format = FileSignature.detect(bytes.copyOf(minOf(bytes.size, FileSignature.PROBE_BYTES)))
                             ?: throw ImportException(ImportException.Reason.UNSUPPORTED_FORMAT)
                         val page = firstPage(bytes, format)
-                        val text = try {
-                            TextReader.read(page)
+                        // Photo : redressée et recadrée sur le document. PDF : gardé tel quel, première page lue.
+                        var image = page
+                        var stored = bytes
+                        val lines = try {
+                            if (format == FileFormat.PDF) {
+                                TextReader.recognize(page).lines
+                            } else {
+                                val scan = ScanProcessor.process(page)
+                                if (scan.changed) {
+                                    image = scan.bitmap
+                                    stored = Thumbnails.jpeg(scan.bitmap, maxSide = ImageRenderer.MAX_SIDE, quality = 92)
+                                }
+                                scan.lines
+                            }
                         } catch (e: Exception) {
-                            ""
+                            emptyList()
                         }
-                        val extraction = DocumentReader.read(text, today())
+                        val extraction = DocumentReader.read(lines, today())
                         val category = extraction.category ?: Category.OTHER
                         val recordId = Ids.new()
                         val role = Templates.rolesFor(category).first()
-                        val meta = c.attachments.import(recordId, role, source.name, ByteArrayInputStream(bytes), bytes.size.toLong(), { false }) {}
-                        c.attachments.putThumb(meta, Thumbnails.jpeg(page))
+                        val meta = try {
+                            c.attachments.import(recordId, role, source.name, ByteArrayInputStream(stored), stored.size.toLong(), { false }) {}
+                        } finally {
+                            if (stored !== bytes) stored.wipe()
+                        }
+                        c.attachments.putThumb(meta, Thumbnails.jpeg(image))
                         state.attachments = state.attachments + meta
 
                         val d = Draft(recordId, true, category, c.clock.wallMillis(), false, extraction.docType.orEmpty(), "", extraction)
