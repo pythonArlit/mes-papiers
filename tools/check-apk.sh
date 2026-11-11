@@ -26,7 +26,10 @@ echo "$BADGING" | grep -q "package: name='app.mespapiers'" || err "identifiant d
 
 # Un seul composant exporté : l'activité du lanceur. Une bibliothèque ne doit pas en ajouter.
 EXPORTED=$(echo "$XML" | grep -c 'android:exported([^)]*)=true' || true)
-[ "$EXPORTED" -eq 1 ] || err "$EXPORTED composants exportés au lieu d'un seul"
+if [ "$EXPORTED" -ne 1 ]; then
+  echo "$XML" | awk '/^ *E: /{el=$2; name=""} /android:name\(/{ if (name=="") { name=$0; sub(/.*="/,"",name); sub(/".*/,"",name) } } /android:exported\([^)]*\)=true/{print "  exporté :", el, name}' >&2
+  err "$EXPORTED composants exportés au lieu d'un seul"
+fi
 
 # Aucun code ni donnée de démonstration : marqueur des données fictives et classes demo.
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
