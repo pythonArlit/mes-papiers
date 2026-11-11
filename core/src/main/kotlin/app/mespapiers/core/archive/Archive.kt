@@ -320,7 +320,9 @@ object ArchiveReader {
 
         fun drain() {
             val buf = ByteArray(8192)
-            while (read(buf, 0, buf.size) >= 0) Unit
+            while (read(buf, 0, buf.size) >= 0) {
+                // On jette le reste de la pièce que le récepteur n'a pas lu.
+            }
         }
 
         override fun close() = Unit
