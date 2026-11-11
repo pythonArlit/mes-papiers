@@ -49,5 +49,12 @@
                 android:resource="@xml/capture_paths" />
         </provider>
 
+        <!-- Récepteur exporté ajouté par androidx.profileinstaller (commandes adb de mise au
+             point). Il n'est pas nécessaire au fonctionnement : retiré pour ne garder qu'un
+             seul composant exporté. -->
+        <receiver
+            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+            tools:ignore="MissingClass"
+            tools:node="remove" />
     </application>
 </manifest>
