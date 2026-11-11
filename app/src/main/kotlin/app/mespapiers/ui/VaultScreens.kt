@@ -1,6 +1,25 @@
 package app.mespapiers.ui
 
+import android.content.ActivityNotFoundException
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import app.mespapiers.ViewerState
+import app.mespapiers.core.model.AttachmentMeta
+import app.mespapiers.core.model.AttachmentRole
+import app.mespapiers.core.model.Templates
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -71,6 +90,7 @@ fun VaultRoot(vm: VaultViewModel, onLock: () -> Unit) {
         }
         VaultScreen.PickCategory -> PickCategoryScreen(vm)
         VaultScreen.Edit -> vm.draft?.let { EditScreen(vm, it) }
+        is VaultScreen.Viewer -> ViewerScreen(vm)
     }
 }
 
@@ -200,6 +220,8 @@ private fun DetailScreen(vm: VaultViewModel, record: Record) {
     // Champs sensibles dévoilés à la demande ; l'état disparaît au verrouillage et en quittant la fiche.
     val revealed = remember(record.id) { mutableStateMapOf<String, Boolean>() }
     var confirmDelete by remember(record.id) { mutableStateOf(false) }
+    var askDuplicate by remember(record.id) { mutableStateOf(false) }
+    val attachments = vm.attachmentsOf(record.id)
 
     Title(record.title)
     Text(stringResource(categoryLabelRes(record.category)), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -233,11 +255,35 @@ private fun DetailScreen(vm: VaultViewModel, record: Record) {
         }
     }
 
+    AttachmentsSection(vm, record, attachments)
+
     WideButton(stringResource(R.string.detail_edit), enabled = !vm.busy) { vm.edit(record) }
     WideOutlinedButton(stringResource(if (record.favorite) R.string.detail_unfavorite else R.string.detail_favorite), enabled = !vm.busy) { vm.toggleFavorite(record) }
-    WideOutlinedButton(stringResource(R.string.detail_duplicate), enabled = !vm.busy) { vm.duplicate(record) }
+    WideOutlinedButton(stringResource(R.string.detail_duplicate), enabled = !vm.busy) {
+        if (attachments.isEmpty()) vm.duplicate(record, copyAttachments = false) else askDuplicate = true
+    }
     WideOutlinedButton(stringResource(R.string.detail_delete), enabled = !vm.busy) { confirmDelete = true }
     WideOutlinedButton(stringResource(R.string.action_back)) { vm.back() }
+
+    if (askDuplicate) {
+        AlertDialog(
+            onDismissRequest = { askDuplicate = false },
+            title = { Text(stringResource(R.string.duplicate_title)) },
+            text = { Text(pluralStringResource(R.plurals.duplicate_body, attachments.size, attachments.size)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    askDuplicate = false
+                    vm.duplicate(record, copyAttachments = true)
+                }) { Text(stringResource(R.string.duplicate_with)) }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    askDuplicate = false
+                    vm.duplicate(record, copyAttachments = false)
+                }) { Text(stringResource(R.string.duplicate_without)) }
+            },
+        )
+    }
 
     if (confirmDelete) {
         AlertDialog(
@@ -363,5 +409,149 @@ private fun CustomFieldEditor(vm: VaultViewModel, f: DraftField) {
             }
             TextButton(onClick = { vm.removeField(f) }) { Text(stringResource(R.string.edit_remove_field)) }
         }
+    }
+}
+
+// ------------------------------------------------------------ pièces jointes
+
+@StringRes
+private fun roleLabelRes(role: AttachmentRole): Int = when (role) {
+    AttachmentRole.FRONT -> R.string.role_front
+    AttachmentRole.BACK -> R.string.role_back
+    AttachmentRole.DOCUMENT -> R.string.role_document
+    AttachmentRole.PROOF -> R.string.role_proof
+    AttachmentRole.OTHER -> R.string.role_other
+}
+
+private fun formatSize(bytes: Long): String =
+    if (bytes >= 1024 * 1024) "%.1f Mo".format(bytes / (1024.0 * 1024.0)) else "%d Ko".format((bytes + 1023) / 1024)
+
+@Composable
+private fun AttachmentsSection(vm: VaultViewModel, record: Record, attachments: List<AttachmentMeta>) {
+    val suggested = Templates.rolesFor(record.category)
+    val roles = (suggested + AttachmentRole.entries).distinct()
+    // Rôle proposé : le premier rôle suggéré qui n'est pas encore utilisé.
+    var role by remember(record.id, attachments.size) {
+        mutableStateOf(suggested.firstOrNull { r -> attachments.none { it.role == r } } ?: AttachmentRole.OTHER)
+    }
+    var toDelete by remember(record.id) { mutableStateOf<AttachmentMeta?>(null) }
+
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) vm.importFrom(uri, record.id, role)
+    }
+    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        vm.onCaptureResult(success, record.id, role)
+    }
+
+    SectionTitle(stringResource(R.string.attach_title))
+    if (attachments.isEmpty()) Text(stringResource(R.string.attach_none), style = MaterialTheme.typography.bodyLarge)
+    attachments.forEach { a ->
+        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                Text(stringResource(roleLabelRes(a.role)), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    listOf(a.originalName, a.format.extension.uppercase(), formatSize(a.plainSize)).filter { it.isNotBlank() }.joinToString(" · "),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { vm.openAttachment(a) }, enabled = !vm.busy) { Text(stringResource(R.string.attach_open)) }
+                    TextButton(onClick = { toDelete = a }, enabled = !vm.busy) { Text(stringResource(R.string.attach_delete), color = MaterialTheme.colorScheme.error) }
+                }
+            }
+        }
+    }
+
+    val progress = vm.importProgress
+    if (progress != null) {
+        BusyRow(stringResource(R.string.attach_importing, formatSize(progress)))
+        WideOutlinedButton(stringResource(R.string.attach_cancel)) { vm.cancelImport() }
+    } else if (vm.canAttach(record.id)) {
+        Text(stringResource(R.string.attach_role_prompt), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            roles.forEach { r -> FilterChip(selected = role == r, onClick = { role = r }, label = { Text(stringResource(roleLabelRes(r))) }) }
+        }
+        WideOutlinedButton(stringResource(R.string.attach_pick), enabled = !vm.busy) {
+            vm.beforeExternalActivity()
+            try {
+                picker.launch(arrayOf("image/jpeg", "image/png", "application/pdf"))
+            } catch (e: ActivityNotFoundException) {
+                vm.onCameraMissing()
+            }
+        }
+        WideOutlinedButton(stringResource(R.string.attach_photo), enabled = !vm.busy) {
+            val uri = vm.prepareCapture()
+            if (uri != null) {
+                try {
+                    camera.launch(uri)
+                } catch (e: ActivityNotFoundException) {
+                    vm.onCameraMissing()
+                }
+            }
+        }
+        Text(stringResource(R.string.attach_source_note), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    } else {
+        Text(stringResource(R.string.attach_too_many), style = MaterialTheme.typography.bodyMedium)
+    }
+
+    toDelete?.let { a ->
+        AlertDialog(
+            onDismissRequest = { toDelete = null },
+            title = { Text(stringResource(R.string.attach_delete_title)) },
+            text = { Text(stringResource(R.string.attach_delete_body, stringResource(roleLabelRes(a.role)))) },
+            confirmButton = {
+                TextButton(onClick = {
+                    toDelete = null
+                    vm.deleteAttachment(a)
+                }) { Text(stringResource(R.string.delete_confirm), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { toDelete = null }) { Text(stringResource(R.string.action_cancel)) } },
+        )
+    }
+}
+
+@Composable
+private fun ViewerScreen(vm: VaultViewModel) {
+    when (val v = vm.viewer) {
+        ViewerState.Loading -> BusyRow()
+        is ViewerState.Failed -> InfoCard(stringResource(R.string.viewer_title), stringResource(v.message), warning = true)
+        is ViewerState.Picture -> ZoomableImage(v.bitmap, stringResource(R.string.viewer_image_description))
+        is ViewerState.PdfPage -> {
+            Text(stringResource(R.string.viewer_page, v.index + 1, v.count), Modifier.semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.titleMedium)
+            ZoomableImage(v.bitmap, stringResource(R.string.viewer_page, v.index + 1, v.count))
+            if (v.count > 1) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { vm.showPdfPage(v.index - 1) }, enabled = v.index > 0, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                        Text(stringResource(R.string.viewer_previous))
+                    }
+                    TextButton(onClick = { vm.showPdfPage(v.index + 1) }, enabled = v.index < v.count - 1, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                        Text(stringResource(R.string.viewer_next))
+                    }
+                }
+            }
+        }
+    }
+    WideOutlinedButton(stringResource(R.string.action_back)) { vm.back() }
+}
+
+/** Image agrandissable par pincement, déplaçable une fois agrandie. */
+@Composable
+private fun ZoomableImage(bitmap: android.graphics.Bitmap, description: String) {
+    var scale by remember(bitmap) { mutableStateOf(1f) }
+    var offset by remember(bitmap) { mutableStateOf(Offset.Zero) }
+    val transform = rememberTransformableState { zoom, pan, _ ->
+        scale = (scale * zoom).coerceIn(1f, 6f)
+        offset = if (scale == 1f) Offset.Zero else offset + pan
+    }
+    Box(Modifier.fillMaxWidth().clipToBounds().background(Color.White)) {
+        Image(
+            bitmap.asImageBitmap(),
+            contentDescription = description,
+            modifier = Modifier
+                .fillMaxWidth()
+                .graphicsLayer(scaleX = scale, scaleY = scale, translationX = offset.x, translationY = offset.y)
+                .transformable(transform, canPan = { scale > 1f }),
+            contentScale = ContentScale.FillWidth,
+        )
     }
 }

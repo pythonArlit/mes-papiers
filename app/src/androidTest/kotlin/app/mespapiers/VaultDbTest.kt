@@ -66,7 +66,7 @@ class VaultDbTest {
         val e = gate.beginSetup("ma phrase très secrète".toCharArray())
         val seed = Base32.decode(e.manualKey())
         assertEquals(null, gate.confirmSetup(e, Totp.code(seed, Totp.stepAt(clock.wallMillis() / 1000))))
-        db = Room.databaseBuilder(context, VaultDb::class.java, dbName).build()
+        db = VaultDb.open(context, dbName)
         vault = Vault(db, gate)
     }
 
@@ -84,7 +84,7 @@ class VaultDbTest {
         vault.put(passport)
         vault.put(rib)
         db.close()
-        db = Room.databaseBuilder(context, VaultDb::class.java, dbName).build()
+        db = VaultDb.open(context, dbName)
         vault = Vault(db, gate)
 
         val loaded = vault.loadAll()

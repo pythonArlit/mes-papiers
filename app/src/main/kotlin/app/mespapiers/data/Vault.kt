@@ -10,7 +10,12 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
+import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
+import android.content.Context
+import app.mespapiers.core.model.AttachmentMeta
 import app.mespapiers.core.access.SessionGate
 import app.mespapiers.core.docs.SearchIndex
 import app.mespapiers.core.model.Record
@@ -40,9 +45,41 @@ interface RecordDao {
     fun count(): Int
 }
 
-@Database(entities = [RecordRow::class], version = 1, exportSchema = false)
+/** Métadonnées chiffrées d'une pièce jointe ; le contenu est dans un fichier chiffré nommé d'après [id]. */
+@Entity(tableName = "attachments")
+class AttachmentRow(@PrimaryKey val id: String, val blob: ByteArray)
+
+@Dao
+interface AttachmentDao {
+    @Query("SELECT * FROM attachments")
+    fun all(): List<AttachmentRow>
+
+    @Query("SELECT id FROM attachments")
+    fun ids(): List<String>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun put(row: AttachmentRow)
+
+    @Query("DELETE FROM attachments WHERE id = :id")
+    fun delete(id: String)
+}
+
+@Database(entities = [RecordRow::class, AttachmentRow::class], version = 2, exportSchema = false)
 abstract class VaultDb : RoomDatabase() {
     abstract fun records(): RecordDao
+    abstract fun attachments(): AttachmentDao
+
+    companion object {
+        /** Version 2 : table des pièces jointes. Les fiches existantes sont conservées telles quelles. */
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `attachments` (`id` TEXT NOT NULL, `blob` BLOB NOT NULL, PRIMARY KEY(`id`))")
+            }
+        }
+
+        fun open(context: Context, name: String): VaultDb =
+            Room.databaseBuilder(context.applicationContext, VaultDb::class.java, name).addMigrations(MIGRATION_1_2).build()
+    }
 }
 
 /** Accès aux fiches. Toutes les fonctions lèvent VaultLockedException si la session est verrouillée. */
@@ -95,6 +132,7 @@ class VaultState {
         private set
     var unreadable by mutableStateOf(0)
         private set
+    var attachments by mutableStateOf<List<AttachmentMeta>>(emptyList())
     private val index = SearchIndex()
 
     fun set(list: List<Record>, unreadableCount: Int, categoryLabel: (Record) -> String) {
@@ -108,6 +146,7 @@ class VaultState {
 
     fun clear() {
         records = emptyList()
+        attachments = emptyList()
         unreadable = 0
         loaded = false
         index.clear()

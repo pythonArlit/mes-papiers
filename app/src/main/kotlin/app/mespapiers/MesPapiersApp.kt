@@ -15,7 +15,7 @@ import app.mespapiers.core.docs.LockConfig
 import app.mespapiers.core.docs.LockTimers
 import app.mespapiers.platform.AndroidClock
 import app.mespapiers.platform.KeystoreDeviceKey
-import androidx.room.Room
+import app.mespapiers.data.AttachmentStore
 import app.mespapiers.data.Vault
 import app.mespapiers.data.VaultDb
 import app.mespapiers.data.VaultState
@@ -37,14 +37,16 @@ class AppContainer(context: Context) {
     val gate = SessionGate(store, seedKey, dataKey, clock, newKdfParams = ::freshKdf)
     val timers = LockTimers(LockConfig())
 
-    private val db = Room.databaseBuilder(appContext, VaultDb::class.java, "vault.db").build()
+    private val db = VaultDb.open(appContext, "vault.db")
     val vault = Vault(db, gate)
+    val attachments = AttachmentStore(appContext, db, gate)
     val vaultState = VaultState()
 
     /** Verrouille la session et vide tout ce qui a été déchiffré en mémoire. */
     fun lockNow() {
         gate.lock()
         vaultState.clear()
+        attachments.clearPlainCopies()
     }
 
     private val keyguard = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
@@ -90,6 +92,8 @@ class MesPapiersApp : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        // Nettoyage systématique au démarrage : fichiers de travail en clair et orphelins.
+        Thread { runCatching { container.attachments.cleanup() } }.start()
         // Extinction de l'écran : verrouillage immédiat, étape intermédiaire comprise.
         val screenOff = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {

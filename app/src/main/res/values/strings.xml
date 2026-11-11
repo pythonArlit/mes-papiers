@@ -178,6 +178,48 @@
     <string name="warn_iban_checksum">La clé de contrôle de cet IBAN ne correspond pas. Vérifie la saisie ; tu peux quand même l’enregistrer.</string>
     <string name="warn_rib">Longueur ou caractères inhabituels pour un RIB. Tu peux quand même l’enregistrer.</string>
 
+    <!-- Pièces jointes -->
+    <string name="attach_title">Pièces jointes</string>
+    <string name="attach_none">Aucune pièce jointe. Tu peux en ajouter maintenant ou plus tard.</string>
+    <string name="attach_role_prompt">Type de la pièce à ajouter :</string>
+    <string name="attach_pick">Ajouter un fichier (photo ou PDF)</string>
+    <string name="attach_photo">Prendre une photo</string>
+    <string name="attach_photo_name">Photo</string>
+    <string name="attach_source_note">Le fichier d’origine reste là où il est sur ton téléphone : Mes Papiers en garde une copie chiffrée. À toi de supprimer l’original si tu ne veux pas le laisser en clair.</string>
+    <string name="attach_importing">Import en cours : %1$s</string>
+    <string name="attach_cancel">Annuler l’import</string>
+    <string name="attach_open">Ouvrir</string>
+    <string name="attach_delete">Supprimer</string>
+    <string name="attach_delete_title">Supprimer cette pièce ?</string>
+    <string name="attach_delete_body">La pièce « %1$s » sera supprimée définitivement du coffre. La fiche est conservée.</string>
+    <string name="attach_too_many">Une fiche peut contenir 10 pièces au maximum.</string>
+    <string name="attach_too_large">Ce fichier dépasse 20 Mo. Réduis-le ou choisis-en un autre.</string>
+    <string name="attach_unsupported">Ce fichier n’est ni une image JPEG ou PNG, ni un PDF. Son contenu réel ne correspond pas à ces formats.</string>
+    <string name="attach_corrupted">Ce fichier est abîmé ou illisible. Il n’a pas été ajouté.</string>
+    <string name="attach_pdf_protected">Ce PDF est protégé par un mot de passe et ne pourrait pas être affiché. Enlève la protection puis réessaie. Il n’a pas été ajouté.</string>
+    <string name="attach_no_space">Il n’y a plus assez d’espace sur le téléphone. Rien n’a été ajouté.</string>
+    <string name="attach_failed">L’import n’a pas abouti. Rien n’a été ajouté ; réessaie.</string>
+    <string name="attach_camera_unavailable">Aucune application ne peut faire cela sur ce téléphone.</string>
+    <string name="role_front">Recto</string>
+    <string name="role_back">Verso</string>
+    <string name="role_document">Document</string>
+    <string name="role_proof">Justificatif</string>
+    <string name="role_other">Autre</string>
+    <string name="duplicate_title">Dupliquer le document</string>
+    <plurals name="duplicate_body">
+        <item quantity="one">Ce document a %1$d pièce jointe. Faut-il la copier aussi ?</item>
+        <item quantity="many">Ce document a %1$d pièces jointes. Faut-il les copier aussi ?</item>
+        <item quantity="other">Ce document a %1$d pièces jointes. Faut-il les copier aussi ?</item>
+    </plurals>
+    <string name="duplicate_with">Copier aussi les pièces</string>
+    <string name="duplicate_without">Sans les pièces</string>
+    <string name="viewer_title">Affichage impossible</string>
+    <string name="viewer_failed">Cette pièce n’a pas pu être affichée.</string>
+    <string name="viewer_image_description">Pièce jointe</string>
+    <string name="viewer_page">Page %1$d sur %2$d</string>
+    <string name="viewer_previous">Page précédente</string>
+    <string name="viewer_next">Page suivante</string>
+
     <!-- Champs -->
     <string name="field_type">Type de pièce</string>
     <string name="field_holder">Titulaire</string>
