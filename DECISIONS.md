@@ -144,6 +144,11 @@ Le cahier des charges plaçait « OCR ou extraction automatique de champs » hor
 - **Prudence sur les identifiants.** Une zone lisible par machine n'est utilisée que si au moins deux de ses clés de contrôle sont justes ; un IBAN n'est proposé que si sa clé est juste. Mieux vaut un champ vide qu'un numéro faux.
 - Le texte reconnu n'est jamais stocké : seuls les champs validés le sont, chiffrés comme les autres.
 
+**D-30 — Redressement et recadrage du scan.** *En place, testé sur émulateur.*
+Demandé par le commanditaire après un essai sur une vraie carte. À l'ajout d'une photo : le texte est reconnu, l'image est remise à l'endroit d'après l'inclinaison du texte (avec essai des autres sens si presque rien n'est lu), puis rognée sur le document. Le rectangle du document est cherché dans le noyau (`DocumentCropper`, Kotlin pur) : plus grande zone d'un seul tenant qui se détache du fond, acceptée seulement si elle contient l'essentiel du texte ; à défaut, la zone de texte avec une marge. Aucune bibliothèque de plus, rien ne sort du téléphone. Limite assumée : pas de correction de perspective. L'alternative écartée pour l'instant est le scanner de documents des services Google Play, qui corrige la perspective mais exige ces services, télécharge un module, ne s'applique pas aux fichiers importés et ne peut pas être testé par la CI.
+
+**D-31 — Valeurs rattachées aux libellés par leur position.** *En place.* La lecture utilise la position des lignes reconnues : la valeur d'un champ est ce qui suit le libellé sur sa ligne, sinon la ligne à sa droite, sinon celle du dessous dans la même colonne. Les libellés sont reconnus en français et en anglais, y compris sur une même ligne (« Prénoms/ GivenNames »), et ne sont jamais pris pour des valeurs.
+
 **D-28 — Aperçus chiffrés.** *En place.* Chaque pièce a un aperçu réduit (JPEG, 720 pixels au plus) chiffré dans un fichier à part. Les listes et la fiche l'affichent sans déchiffrer la pièce entière ; un appui ouvre le document complet. Les aperçus déchiffrés ne vivent qu'en mémoire pendant la session.
 
 **D-29 — Habillage.** *En place, jamais vu à l'écran (voir `ECARTS.md` E-08).* Barre de titre avec retour, cartes avec vignette du document, pastilles d'échéance, action principale fixe en bas des formulaires, icônes Material. Couleurs de conteneur dérivées de la palette du cahier des charges.

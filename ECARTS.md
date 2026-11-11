@@ -53,10 +53,10 @@ Les listes affichent au plus 100 fiches à la fois, avec invitation à préciser
 
 **E-15 — Lecture automatique : hors périmètre initial, limites réelles.**
 Ajoutée à la demande du commanditaire (`DECISIONS.md`, D-27), contre l'exclusion du cahier des charges. À savoir :
-- **Qualité non mesurée sur de vrais documents.** Les tests utilisent des images de texte net fabriquées pour l'occasion et des textes d'exemple. Sur une photo réelle (reflets, pli, biais, tampon, écriture manuscrite), la lecture sera moins bonne, parfois nulle. Aucun vrai passeport, diplôme ou RIB n'a été essayé.
+- **Qualité presque pas mesurée sur de vrais documents.** Un seul vrai document a été essayé, par l'utilisateur : une carte d'identité, mal lue dans la première version (libellés bilingues, valeurs sous les libellés, deux colonnes, photo couchée). Sa mise en page est maintenant reproduite dans les tests avec des données fictives, mais la vraie carte n'a pas été rescannée. Les autres tests utilisent des images de texte net fabriquées. Sur une photo réelle (reflets, pli, biais, tampon, hologramme, écriture manuscrite), la lecture sera moins bonne, parfois nulle.
 - **Heuristiques.** Hors zone lisible par machine et IBAN, les champs sont devinés d'après des libellés français ou anglais courants. Un document à la mise en page inhabituelle donnera des champs vides ou mal attribués ; c'est pourquoi tout est à relire.
 - **Alphabet latin seulement** ; pour un PDF, seule la première page est lue.
-- **Pas de recadrage ni de redressement** : la photo est gardée telle qu'elle a été prise.
+- **Redressement et recadrage automatiques, sans correction de perspective.** La photo est remise à l'endroit par quarts de tour et rognée par un rectangle droit ; une photo prise de biais reste de biais, et une légère inclinaison n'est pas corrigée. Le recadrage repère le document par contraste avec le fond : sur un fond de même teinte ou très chargé, il se replie sur la zone de texte ou garde un peu d'arrière-plan. La photo d'origine n'est pas conservée dans le coffre : seule l'image redressée et rognée l'est (2 560 pixels de côté au plus, JPEG).
 - **Bibliothèque fermée.** ML Kit est un composant Google non libre embarqué dans l'APK. Sans permission `INTERNET` il ne peut rien transmettre, mais son code n'est pas auditable ici. L'APK grossit sensiblement (modèle et bibliothèques natives).
 - **Mémoire** : le document est tenu entièrement en mémoire pendant le scan (20 Mo au plus), plus l'image décodée.
 

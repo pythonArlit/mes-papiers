@@ -6,8 +6,8 @@ Dernière exécution : 11 novembre 2026, par la CI GitHub Actions (`.github/work
 
 | Niveau | Commande | Environnement | Résultat |
 | --- | --- | --- | --- |
-| Unitaire JVM, module `:core` | `./gradlew :core:test` | Ubuntu 26.04, JDK 17, Gradle 9.6.0, Kotlin 2.4.10 | **104 tests réussis** : AccessTest 27, ArchiveTest 13, AttachmentTest 6, CryptoTest 15, DocsTest 21, ExtractionTest 15, StoreTest 7 |
-| Instrumenté, module `:app` | `./gradlew :app:connectedDemoDebugAndroidTest` | Émulateur Android 14 (API 34), x86-64 | **23 tests réussis** : KeystoreGateTest 7, VaultDbTest 4, AttachmentStoreTest 8, TextReaderTest 4 |
+| Unitaire JVM, module `:core` | `./gradlew :core:test` | Ubuntu 26.04, JDK 17, Gradle 9.6.0, Kotlin 2.4.10 | **112 tests réussis** : AccessTest 27, ArchiveTest 13, AttachmentTest 6, CryptoTest 15, DocsTest 21, ExtractionTest 23, StoreTest 7 |
+| Instrumenté, module `:app` | `./gradlew :app:connectedDemoDebugAndroidTest` | Émulateur Android 14 (API 34), x86-64 | **27 tests réussis** : KeystoreGateTest 7, VaultDbTest 4, AttachmentStoreTest 8, TextReaderTest 8 |
 | Lint | `./gradlew :app:lintProdRelease` | Idem | Réussi, sans erreur |
 | Compilation | `./gradlew :app:assembleDemoDebug :app:assembleProdRelease` | Idem | Réussie |
 | Contrôle de l'APK `prod` | `tools/check-apk.sh` | aapt2 des build-tools | Réussi |
@@ -50,7 +50,9 @@ Statuts : **exécuté et réussi**, **exécuté et en échec**, **non exécuté*
 | | Par l'interface : sélecteur de fichiers, appareil photo, PDF protégé par mot de passe | **Non exécuté** | — | — |
 | **Lecture automatique à l'ajout** (ajoutée au périmètre, `DECISIONS.md` D-27) | Unitaire JVM | **Exécuté et réussi** | `ExtractionTest` : zone lisible par machine (spécimens ICAO, erreurs d'OCR, clés fausses refusées), dates par libellé, numéro à zéros initiaux, diplôme, RIB avec IBAN et BIC, IBAN à clé fausse non proposé, texte sans rapport | JVM 17 |
 | | Instrumenté | **Exécuté et réussi** | `TextReaderTest` : image → texte reconnu sur l'appareil → champs proposés (carte d'identité, zone de passeport, image vide) ; images de texte net fabriquées pour le test | Émulateur, Android 14 |
-| | Sur de vraies photos de documents, par l'interface | **Non exécuté** | — | — |
+| | Unitaire JVM, recadrage et mise en page réelle | **Exécuté et réussi** | `ExtractionTest` : carte bilingue sur deux colonnes avec valeurs sous les libellés (mise en page d'une vraie carte signalée par l'utilisateur, données fictives), valeur à droite du libellé, recadrage clair sur sombre, sombre sur clair, repli sur le texte, zone sans texte refusée, rien à rogner | JVM 17 |
+| | Instrumenté, redressement et recadrage | **Exécuté et réussi** | `TextReaderTest` : `photo_couchee_ou_a_l_envers_redressee` (90°, 180°, 270°), `arriere_plan_rogne_autour_du_document`, `photo_couchee_sur_fond_sombre_redressee_puis_rognee`, `carte_bilingue_sur_deux_colonnes` | Émulateur, Android 14 |
+| | Sur de vraies photos de documents, par l'interface | **Exécuté une fois par l'utilisateur, en échec** le 11/11/2026 sur une carte d'identité (prénom mal lu, pas de recadrage) ; corrigé depuis, **non réexécuté** sur la vraie carte | Démo installée par l'utilisateur | Téléphone de l'utilisateur |
 | **Partage** | Tous | **Non exécuté** | Non écrit | — |
 | **Rappels** | Unitaire JVM | **Exécuté et réussi** pour le calcul | `DocsTest` : `etat_des_echeances`, `rappels_*` | JVM 17 |
 | | Notifications coffre verrouillé, replanification | **Non exécuté** | Non écrit | — |
