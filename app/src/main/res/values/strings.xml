@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Mes Papiers</string>
+    <string name="app_subtitle">Tes pièces d’identité, diplômes et documents importants</string>
+    <string name="demo_banner">DÉMO</string>
+    <string name="skeleton_notice">Cette version est un squelette : le coffre n’est pas encore utilisable. N’y range aucun document réel.</string>
+
+    <!-- Catégories -->
+    <string name="category_identity">Identité</string>
+    <string name="category_diploma">Diplômes et attestations</string>
+    <string name="category_civil_status">État civil</string>
+    <string name="category_address">Adresses</string>
+    <string name="category_bank">Banque</string>
+    <string name="category_other">Autres</string>
+
+    <!-- Accès -->
+    <string name="passphrase_wrong">Phrase secrète incorrecte.</string>
+    <string name="passphrase_wait">Trop d’essais. Réessaie dans %1$s.</string>
+    <string name="totp_wrong">Code incorrect. Il te reste %1$d essais.</string>
+    <string name="totp_expired">Ce code n’est plus valable. Vérifie que l’heure de ton téléphone est réglée automatiquement.</string>
+    <string name="totp_already_used">Ce code a déjà servi. Attends le code suivant.</string>
+    <string name="totp_back_to_passphrase">Trop d’essais ou délai dépassé. Saisis de nouveau ta phrase secrète.</string>
+    <string name="vault_unreadable">Le coffre de ce téléphone n’est plus lisible. Réinstalle l’application puis restaure ta dernière archive avec ta phrase de récupération.</string>
+
+    <!-- Notifications : toujours neutres, jamais de titre ni de catégorie. -->
+    <string name="reminder_title">Mes Papiers</string>
+    <string name="reminder_text">Un document arrive à expiration</string>
+</resources>

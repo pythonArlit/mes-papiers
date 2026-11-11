@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="petrol">#0F4C5C</color>
+    <color name="mint">#5FD3A6</color>
+    <color name="surface_light">#F4F8F8</color>
+    <style name="Theme.MesPapiers" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@color/petrol</item>
+        <item name="android:windowBackground">@color/surface_light</item>
+    </style>
+</resources>
