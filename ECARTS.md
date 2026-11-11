@@ -9,7 +9,7 @@ Tout ce qui est incomplet, non vérifié ou différent du cahier des charges. **
 | Jalon | Fait | Manque |
 | --- | --- | --- |
 | J1 Accès | Configuration, connexion en deux étapes, QR d'enrôlement, délai progressif, verrouillage (écran éteint, arrière-plan, inactivité), avertissement sans verrouillage d'écran | Paramètres : changement de phrase et nouvel enrôlement TOTP (la logique existe dans le noyau, pas l'écran) ; réglage des durées de verrouillage |
-| J2 Fiches et pièces | Fiches : ajout, modification, favori, duplication (avec ou sans pièces), suppression confirmée, champs personnalisés, masquage, accueil, liste, recherche. Pièces jointes : import par le sélecteur système, photo par l'appareil photo du système, limites, format vérifié par signature, annulation, stockage chiffré, visionneuse image et PDF, suppression indépendante, nettoyage au démarrage | Miniatures (les pièces sont listées par type, nom et taille) ; sélecteur de date (saisie au format JJ/MM/AAAA) |
+| J2 Fiches et pièces | Fiches : ajout, modification, favori, duplication (avec ou sans pièces), suppression confirmée, champs personnalisés, masquage, accueil, liste, recherche. Pièces jointes : import par le sélecteur système, photo par l'appareil photo du système, limites, format vérifié par signature, annulation, stockage chiffré, visionneuse image et PDF, suppression indépendante, nettoyage au démarrage | Sélecteur de date (saisie au format JJ/MM/AAAA) |
 | J3 Partage et échéances | État des échéances affiché | Partage, presse-papiers, rappels et notifications |
 | J4 Sauvegarde | Format et lecture vérifiée dans le noyau | Écrans d'export et de restauration, phrase de récupération, rappel d'export |
 | J5 Recette | Tests JVM et instrumentés automatiques | Recette manuelle, accessibilité, captures d'écran |
@@ -50,6 +50,15 @@ Les listes affichent au plus 100 fiches à la fois, avec invitation à préciser
 - Le rendu PDF depuis la mémoire est testé sur Android 14 ; le repli par fichier temporaire (Android 8 à 10) n'a pas été exécuté.
 - Une pièce est déchiffrée entièrement en mémoire pour être affichée (20 Mo au plus), ce qui peut être lourd sur un téléphone à 2 Go de RAM.
 - La photo de travail reste en clair dans le cache privé pendant la prise de vue ; elle est effacée après chiffrement, après annulation et au démarrage.
+
+**E-15 — Lecture automatique : hors périmètre initial, limites réelles.**
+Ajoutée à la demande du commanditaire (`DECISIONS.md`, D-27), contre l'exclusion du cahier des charges. À savoir :
+- **Qualité non mesurée sur de vrais documents.** Les tests utilisent des images de texte net fabriquées pour l'occasion et des textes d'exemple. Sur une photo réelle (reflets, pli, biais, tampon, écriture manuscrite), la lecture sera moins bonne, parfois nulle. Aucun vrai passeport, diplôme ou RIB n'a été essayé.
+- **Heuristiques.** Hors zone lisible par machine et IBAN, les champs sont devinés d'après des libellés français ou anglais courants. Un document à la mise en page inhabituelle donnera des champs vides ou mal attribués ; c'est pourquoi tout est à relire.
+- **Alphabet latin seulement** ; pour un PDF, seule la première page est lue.
+- **Pas de recadrage ni de redressement** : la photo est gardée telle qu'elle a été prise.
+- **Bibliothèque fermée.** ML Kit est un composant Google non libre embarqué dans l'APK. Sans permission `INTERNET` il ne peut rien transmettre, mais son code n'est pas auditable ici. L'APK grossit sensiblement (modèle et bibliothèques natives).
+- **Mémoire** : le document est tenu entièrement en mémoire pendant le scan (20 Mo au plus), plus l'image décodée.
 
 ## Limites connues
 

@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 # Vérifie un APK « prod » release : permissions, débogage, sauvegarde, absence de démo.
-# NON EXÉCUTÉ à ce stade (aucun APK n'a pu être produit) : voir TESTS.md.
-#
 # Usage : tools/check-apk.sh app/build/outputs/apk/prod/release/app-prod-release*.apk
 # Requiert aapt2 (build-tools du SDK Android) et unzip dans le PATH.
 set -euo pipefail
@@ -25,6 +23,10 @@ XML=$(aapt2 dump xmltree "$APK" --file AndroidManifest.xml)
 echo "$XML" | grep -q 'android:allowBackup.*=false' || err "allowBackup n'est pas à false"
 echo "$XML" | grep -q 'android:dataExtractionRules' || err "dataExtractionRules absent"
 echo "$BADGING" | grep -q "package: name='app.mespapiers'" || err "identifiant d'application inattendu"
+
+# Un seul composant exporté : l'activité du lanceur. Une bibliothèque ne doit pas en ajouter.
+EXPORTED=$(echo "$XML" | grep -c 'android:exported([^)]*)=true' || true)
+[ "$EXPORTED" -eq 1 ] || err "$EXPORTED composants exportés au lieu d'un seul"
 
 # Aucun code ni donnée de démonstration : marqueur des données fictives et classes demo.
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT

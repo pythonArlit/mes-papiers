@@ -34,6 +34,8 @@ Chaque décision indique son état : **en place** (code écrit et testé sur JVM
 | activity-compose, core-ktx, lifecycle | 1.13.0, 1.18.0, 2.10.0 |
 | Room | 2.8.4 |
 | ZXing core (QR hors ligne) | 3.5.3 |
+| ML Kit text-recognition (modèle latin embarqué) | 16.0.1 |
+| Compose material-icons-extended | version du BOM |
 | androidx.exifinterface (orientation des photos) | 1.3.7 |
 | Bouncy Castle `bcprov-jdk18on` | 1.78.1 |
 | JUnit, androidx.test runner, ext-junit | 4.13.2, 1.6.2, 1.2.1 |
@@ -131,6 +133,20 @@ En-tête en clair (magie, version, paramètres de dérivation, contrôle de clé
 **D-25 — Validation après import.** *En place.* Une pièce n'est gardée que si elle s'ouvre réellement : image décodable, ou PDF que `PdfRenderer` accepte (un PDF protégé par mot de passe est refusé avec un message explicite).
 
 **D-26 — Visionneuse.** *En place.* Images décodées en mémoire avec un côté borné à 2 560 pixels et orientation EXIF appliquée. PDF rendu une page à la fois ; depuis la mémoire (`memfd`) sur Android 11 et suivants, par fichier temporaire privé avant.
+
+## Lecture automatique des documents
+
+**D-27 — Lecture automatique à l'ajout (OCR), à la demande du commanditaire.** *En place, testée sur émulateur.*
+Le cahier des charges plaçait « OCR ou extraction automatique de champs » hors périmètre. Le commanditaire a demandé le 11/11/2026 que l'application lise le document à l'ajout et pré-remplisse la fiche. Choix faits pour rester dans l'esprit du reste :
+- **Tout se passe sur le téléphone.** La reconnaissance de texte utilise ML Kit (Google) avec le modèle latin **embarqué dans l'APK**, sans téléchargement. L'application n'ayant pas la permission `INTERNET` (contrôlé sur l'APK à chaque build), ni l'image ni le texte ne peuvent sortir, et la télémétrie de la bibliothèque est sans effet.
+- **L'interprétation du texte est dans le noyau** (`DocumentReader`, `Mrz`), en Kotlin pur et testée sur JVM : nature du document, zone lisible par machine des passeports et cartes (ICAO 9303), dates avec leur libellé, numéro, titulaire, établissement, IBAN, BIC.
+- **Rien n'est enregistré sans relecture.** Le scan ouvre la fiche pré-remplie ; chaque champ lu porte la mention « Lu sur le document, à vérifier » jusqu'à ce que l'utilisateur le modifie ; la fiche n'existe qu'après « Enregistrer ». Abandonner supprime la pièce scannée.
+- **Prudence sur les identifiants.** Une zone lisible par machine n'est utilisée que si au moins deux de ses clés de contrôle sont justes ; un IBAN n'est proposé que si sa clé est juste. Mieux vaut un champ vide qu'un numéro faux.
+- Le texte reconnu n'est jamais stocké : seuls les champs validés le sont, chiffrés comme les autres.
+
+**D-28 — Aperçus chiffrés.** *En place.* Chaque pièce a un aperçu réduit (JPEG, 720 pixels au plus) chiffré dans un fichier à part. Les listes et la fiche l'affichent sans déchiffrer la pièce entière ; un appui ouvre le document complet. Les aperçus déchiffrés ne vivent qu'en mémoire pendant la session.
+
+**D-29 — Habillage.** *En place, jamais vu à l'écran (voir `ECARTS.md` E-08).* Barre de titre avec retour, cartes avec vignette du document, pastilles d'échéance, action principale fixe en bas des formulaires, icônes Material. Couleurs de conteneur dérivées de la palette du cahier des charges.
 
 ## Points ouverts à valider sur appareil
 
