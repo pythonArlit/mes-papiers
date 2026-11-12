@@ -109,10 +109,12 @@
 
     <!-- Scan et lecture automatique -->
     <string name="scan_action">Scanner un document</string>
-    <string name="scan_pitch">Prends le document en photo ou choisis un fichier : Mes Papiers le redresse, le recadre, le lit sur ton téléphone et prépare la fiche. Tu vérifies, tu corriges, tu enregistres.</string>
+    <string name="scan_pitch">Scanne le document : les bords sont détectés, tu ajustes les coins si besoin, puis Mes Papiers le lit sur ton téléphone et prépare la fiche. Tu vérifies, tu corriges, tu enregistres.</string>
     <string name="scan_manual">Saisir à la main, sans scanner</string>
-    <string name="scan_source_hint">Pose le document à plat, bien éclairé, et cadre-le entièrement.</string>
-    <string name="scan_from_file">Choisir une photo ou un PDF</string>
+    <string name="scan_source_hint">Le scanner détecte les bords du document, le redresse et te laisse ajuster les coins. À la toute première utilisation, le téléphone peut avoir besoin d’une connexion pour installer le module de scan de Google.</string>
+    <string name="scan_with_camera">Scanner avec l’appareil photo</string>
+    <string name="scan_file_name">Scan</string>
+    <string name="scan_from_file">Choisir un PDF ou une image</string>
     <string name="scan_reading">Lecture du document…</string>
     <plurals name="scan_detected">
         <item quantity="one">%1$d information a été lue sur le document. Vérifie-la avant d’enregistrer.</item>

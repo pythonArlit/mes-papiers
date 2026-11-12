@@ -87,6 +87,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.zxing.core)
     implementation(libs.mlkit.text.recognition)
+    implementation(libs.mlkit.document.scanner)
     implementation(libs.compose.material.icons.extended)
     implementation(libs.androidx.exifinterface)
     implementation(libs.androidx.room.runtime)

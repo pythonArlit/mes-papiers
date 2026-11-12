@@ -111,7 +111,8 @@ class TextReaderTest {
             drawColor(Color.rgb(28, 28, 32))
             drawBitmap(card, 500f, 600f, null)
         }
-        val result = ScanProcessor.process(photo)
+        assertTrue("le recadrage maison est désactivé par défaut", !ScanProcessor.process(photo).cropped)
+        val result = ScanProcessor.process(photo, crop = true)
         assertTrue(result.cropped)
         val w = result.bitmap.width
         val h = result.bitmap.height
@@ -132,7 +133,7 @@ class TextReaderTest {
             drawColor(Color.rgb(28, 28, 32))
             drawBitmap(card, 350f, 450f, null)
         }
-        val result = ScanProcessor.process(rotated(photo, 90f))
+        val result = ScanProcessor.process(rotated(photo, 90f), crop = true)
         assertTrue(result.rotated && result.cropped)
         assertTrue("${result.bitmap.width}x${result.bitmap.height}", result.bitmap.width > result.bitmap.height)
         assertTrue(kotlin.math.abs(result.bitmap.width - card.width) < card.width * 0.08)

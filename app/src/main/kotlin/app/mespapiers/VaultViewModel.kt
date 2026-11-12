@@ -590,6 +590,18 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
 
     fun scanFromUri(uri: Uri) = startScan(sourceOf(uri))
 
+    /** Résultat du scanner de documents : une image déjà cadrée, écrite dans le cache privé. */
+    fun onScannerResult(uri: Uri?) {
+        if (uri == null) return
+        val file = uri.takeIf { it.scheme == "file" }?.path?.let(::File)
+        if (file != null) {
+            // Copie en clair temporaire : effacée dès qu'elle est chiffrée dans le coffre, ou en cas d'échec.
+            startScan(Source(string(R.string.scan_file_name), file.length(), file) { file.inputStream() })
+        } else {
+            startScan(sourceOf(uri))
+        }
+    }
+
     fun onScanCapture(success: Boolean) {
         startScan(takeCapture(success) ?: return)
     }

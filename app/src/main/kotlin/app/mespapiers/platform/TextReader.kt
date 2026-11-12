@@ -49,9 +49,12 @@ object TextReader {
 }
 
 /**
- * Préparation d'un scan : l'image est redressée (texte à l'endroit) puis recadrée sur le
- * document pour retirer l'arrière-plan. Le recadrage est droit, sans correction de
- * perspective.
+ * Préparation d'un scan : l'image est redressée (texte à l'endroit).
+ *
+ * Le recadrage automatique maison ([crop]) est désactivé par défaut : essayé sur une vraie
+ * photo, il s'est montré peu fiable, et un mauvais recadrage abîme un document dont
+ * l'original n'est pas conservé. Le recadrage est confié au scanner de documents
+ * (DocumentScanner), où l'utilisateur ajuste les coins. Voir DECISIONS.md, D-32.
  */
 object ScanProcessor {
     class Result(val bitmap: Bitmap, val lines: List<TextLine>, val rotated: Boolean, val cropped: Boolean) {
@@ -65,7 +68,7 @@ object ScanProcessor {
 
     private fun quarterTurns(angle: Float): Int = (angle / 90f).roundToInt().mod(4)
 
-    fun process(page: Bitmap): Result {
+    fun process(page: Bitmap, crop: Boolean = false): Result {
         var bitmap = page
         var text = TextReader.recognize(bitmap)
         var rotated = false
@@ -93,9 +96,9 @@ object ScanProcessor {
             }
         }
 
-        val crop = findCrop(bitmap, text.lines) ?: return Result(bitmap, text.lines, rotated, false)
-        val cropped = Bitmap.createBitmap(bitmap, crop.left, crop.top, crop.width, crop.height)
-        val shifted = text.lines.map { TextLine(it.text, it.left - crop.left, it.top - crop.top, it.bottom - crop.top, it.right - crop.left) }
+        val box = (if (crop) findCrop(bitmap, text.lines) else null) ?: return Result(bitmap, text.lines, rotated, false)
+        val cropped = Bitmap.createBitmap(bitmap, box.left, box.top, box.width, box.height)
+        val shifted = text.lines.map { TextLine(it.text, it.left - box.left, it.top - box.top, it.bottom - box.top, it.right - box.left) }
         return Result(cropped, shifted, rotated, true)
     }
 

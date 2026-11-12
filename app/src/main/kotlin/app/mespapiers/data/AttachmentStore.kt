@@ -42,6 +42,8 @@ class AttachmentStore(context: Context, private val db: VaultDb, private val gat
     fun cleanup() {
         captureDir.deleteRecursively()
         viewDir.deleteRecursively()
+        // Images laissées en clair par le scanner de documents si l'application a été tuée en plein scan.
+        captureDir.parentFile?.listFiles()?.filter { it.name.startsWith("mlkit_docscan") }?.forEach { it.deleteRecursively() }
         dir.mkdirs()
         val known = db.attachments().ids().toSet()
         dir.listFiles()?.forEach { f ->

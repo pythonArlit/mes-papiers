@@ -1,6 +1,10 @@
 package app.mespapiers.ui
 
+import android.app.Activity
 import android.content.ActivityNotFoundException
+import androidx.activity.result.IntentSenderRequest
+import androidx.compose.ui.platform.LocalContext
+import app.mespapiers.platform.DocumentScanner
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -350,6 +354,40 @@ private fun HomeScreen(vm: VaultViewModel, onLock: () -> Unit) {
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) vm.scanFromUri(uri) }
     val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success -> vm.onScanCapture(success) }
+    val scanner = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+        vm.onScannerResult(if (result.resultCode == Activity.RESULT_OK) DocumentScanner.resultUri(result.data) else null)
+    }
+    val activity = DocumentScanner.activityOf(LocalContext.current)
+
+    // Repli quand le scanner de documents n'est pas disponible sur ce téléphone.
+    val systemCamera = {
+        val uri = vm.prepareCapture()
+        if (uri != null) {
+            try {
+                camera.launch(uri)
+            } catch (e: ActivityNotFoundException) {
+                vm.onCameraMissing()
+            }
+        }
+    }
+    val launchScanner = {
+        vm.beforeExternalActivity()
+        if (activity == null) {
+            systemCamera()
+        } else {
+            DocumentScanner.start(
+                activity,
+                onReady = { sender ->
+                    try {
+                        scanner.launch(IntentSenderRequest.Builder(sender).build())
+                    } catch (e: Exception) {
+                        systemCamera()
+                    }
+                },
+                onUnavailable = { systemCamera() },
+            )
+        }
+    }
 
     ScreenFrame(
         title = stringResource(R.string.app_name),
@@ -415,16 +453,9 @@ private fun HomeScreen(vm: VaultViewModel, onLock: () -> Unit) {
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(stringResource(R.string.scan_source_hint))
-                    ActionButton(stringResource(R.string.attach_photo), Icons.Filled.PhotoCamera, primary = true, modifier = Modifier.fillMaxWidth()) {
+                    ActionButton(stringResource(R.string.scan_with_camera), Icons.Filled.DocumentScanner, primary = true, modifier = Modifier.fillMaxWidth()) {
                         chooseSource = false
-                        val uri = vm.prepareCapture()
-                        if (uri != null) {
-                            try {
-                                camera.launch(uri)
-                            } catch (e: ActivityNotFoundException) {
-                                vm.onCameraMissing()
-                            }
-                        }
+                        launchScanner()
                     }
                     ActionButton(stringResource(R.string.scan_from_file), Icons.Filled.UploadFile, modifier = Modifier.fillMaxWidth()) {
                         chooseSource = false
