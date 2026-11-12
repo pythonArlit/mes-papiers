@@ -35,6 +35,8 @@ jobs:
   appareil:
     name: Tests instrumentés (émulateur Android 14)
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -54,10 +56,31 @@ jobs:
           arch: x86_64
           target: default
           disable-animations: true
-          script: ./gradlew :app:connectedDemoDebugAndroidTest
+          profile: pixel_6
+          script: |
+            adb shell settings put secure show_ime_with_hard_keyboard 0
+            ./gradlew :app:connectedDemoDebugAndroidTest
+            mkdir -p app/build/kept && cp -r app/build/outputs/androidTest-results app/build/kept/androidTest-results-principal
+            ./gradlew :app:connectedDemoDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.mespapiers.ScreenshotTour -Pandroid.testInstrumentationRunnerArguments.tour=1 || true
+            adb pull /sdcard/Download/mespapiers captures || true
       - name: Résumé des tests instrumentés
         if: always()
         run: find app/build -name '*.xml' -path '*androidTest-results*' -exec grep -ho 'testsuite name="[^"]*" tests="[0-9]*" failures="[0-9]*"' {} + | sed 's/^/RESUME-APPAREIL /' || find app/build -name '*.xml' | grep -i test | head
+      - name: Détail d'un échec de la visite guidée
+        if: always()
+        run: grep -rh -A14 '<failure' app/build/outputs/androidTest-results | head -45 || true
+      # Captures d'écran de la variante demo (données fictives), publiées sur la branche « captures ».
+      - name: Publie les captures d'écran
+        if: always()
+        run: |
+          [ -d captures ] && ls captures | grep -q png || { echo "aucune capture"; exit 0; }
+          cd captures
+          git init -q -b captures
+          git config user.name "CI Mes Papiers"
+          git config user.email "ci@mespapiers.invalid"
+          git add -A
+          git commit -qm "Captures d'écran de la démo (données fictives) pour $GITHUB_SHA"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" captures
       - uses: actions/upload-artifact@v4
         if: always()
         with:
