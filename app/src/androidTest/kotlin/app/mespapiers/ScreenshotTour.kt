@@ -59,7 +59,8 @@ class ScreenshotTour {
     }
 
     private fun visibleTexts(): String =
-        device.findObjects(By.textContains("")).take(40).joinToString(" | ") { "${it.text} ${it.visibleBounds.toShortString()}" }
+        device.findObjects(By.pkg(context.packageName)).filter { it.text != null || it.contentDescription != null }.take(60)
+            .joinToString(" | ") { "${it.text ?: ""}/${it.contentDescription ?: ""} ${it.visibleBounds.toShortString()}" }
 
     private fun waitFor(selector: BySelector, timeout: Long = 20_000) {
         if (!device.wait(Until.hasObject(selector), timeout)) throw AssertionError("jamais affiché : $selector ; à l'écran : " + visibleTexts())
