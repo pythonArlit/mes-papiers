@@ -191,7 +191,7 @@ class ScreenshotTour {
         shot("connexion")
         tap(By.text("Continuer"))
         waitFor(By.text("Scanner un document"), 120_000)
-        waitFor(By.text("Passeport"))
+        waitFor(By.text("Assurance habitation"))
         shot("accueil")
         scrollDown()
         shot("accueil-suite")

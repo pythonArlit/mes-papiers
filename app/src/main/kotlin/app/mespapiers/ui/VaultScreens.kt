@@ -48,6 +48,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.FileCopy
 import androidx.compose.material.icons.filled.FamilyRestroom
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
@@ -63,6 +65,8 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -107,6 +111,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.mespapiers.DateText
@@ -168,6 +173,8 @@ private fun ScreenFrame(
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back)) }
             } else {
                 Spacer(Modifier.width(12.dp))
+                LogoMark(34.dp, onDark = false)
+                Spacer(Modifier.width(12.dp))
             }
             Text(
                 title,
@@ -212,10 +219,9 @@ private fun ErrorLine(vm: VaultViewModel) {
 private fun SectionTitle(text: String) {
     Text(
         text,
-        Modifier.semantics { heading() }.padding(top = 12.dp),
+        Modifier.semantics { heading() }.padding(top = 14.dp, bottom = 2.dp),
         style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.primary,
+        color = MaterialTheme.colorScheme.onBackground,
     )
 }
 
@@ -390,25 +396,45 @@ private fun HomeScreen(vm: VaultViewModel, onLock: () -> Unit) {
     }
 
     ScreenFrame(
-        title = stringResource(R.string.app_name),
+        title = stringResource(R.string.brand_name),
         onBack = null,
-        actions = { IconButton(onClick = onLock) { Icon(Icons.Filled.Lock, contentDescription = stringResource(R.string.home_lock)) } },
+        actions = {
+            FilledTonalIconButton(onClick = onLock) { Icon(Icons.Filled.Lock, contentDescription = stringResource(R.string.home_lock)) }
+            Spacer(Modifier.width(8.dp))
+        },
     ) {
-        Text(stringResource(R.string.app_subtitle), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-
-        // Carte d'action principale.
-        Card(shape = CardShape, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(stringResource(R.string.home_add), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
+        // Carte d'action principale, aux couleurs de la marque.
+        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(BrandGradient)) {
+            Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box(Modifier.size(44.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Filled.DocumentScanner, contentDescription = null, tint = Color.White)
+                    }
+                    Column {
+                        Text(stringResource(R.string.home_add), style = MaterialTheme.typography.titleLarge, color = Color.White)
+                        Text(stringResource(R.string.app_subtitle), style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.8f))
+                    }
+                }
                 if (vm.scanning) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp)
-                        Text(stringResource(R.string.scan_reading), Modifier.semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        CircularProgressIndicator(Modifier.size(28.dp), color = Color.White, strokeWidth = 3.dp)
+                        Text(stringResource(R.string.scan_reading), Modifier.semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodyLarge, color = Color.White)
                     }
                 } else {
-                    Text(stringResource(R.string.scan_pitch), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    ActionButton(stringResource(R.string.scan_action), Icons.Filled.DocumentScanner, primary = true, modifier = Modifier.fillMaxWidth()) { chooseSource = true }
-                    TextButton(onClick = { vm.newDocument() }, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.scan_manual)) }
+                    Text(stringResource(R.string.scan_pitch), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f))
+                    Button(
+                        onClick = { chooseSource = true },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Petrol),
+                    ) {
+                        Icon(Icons.Filled.DocumentScanner, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.scan_action), style = MaterialTheme.typography.titleMedium)
+                    }
+                    TextButton(onClick = { vm.newDocument() }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), colors = ButtonDefaults.textButtonColors(contentColor = Color.White)) {
+                        Text(stringResource(R.string.scan_manual), style = MaterialTheme.typography.titleSmall)
+                    }
                 }
             }
         }
@@ -424,13 +450,13 @@ private fun HomeScreen(vm: VaultViewModel, onLock: () -> Unit) {
             val favorites = records.filter { it.favorite }
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatTile(records.size.toString(), stringResource(R.string.stat_documents), Modifier.weight(1f))
-                StatTile(favorites.size.toString(), stringResource(R.string.stat_favorites), Modifier.weight(1f))
-                StatTile(due.size.toString(), stringResource(R.string.stat_deadlines), Modifier.weight(1f), alert = due.isNotEmpty())
+                StatTile(records.size.toString(), stringResource(R.string.stat_documents), Icons.Filled.Description, Modifier.weight(1f))
+                StatTile(favorites.size.toString(), stringResource(R.string.stat_favorites), Icons.Filled.Star, Modifier.weight(1f))
+                StatTile(due.size.toString(), stringResource(R.string.stat_deadlines), Icons.Filled.Event, Modifier.weight(1f), alert = due.isNotEmpty())
             }
 
             if (records.isEmpty()) {
-                InfoCard(stringResource(R.string.home_empty_title), stringResource(R.string.home_empty_body))
+                EmptyState(Icons.Filled.FileCopy, stringResource(R.string.home_empty_title), stringResource(R.string.home_empty_body))
             } else {
                 SectionTitle(stringResource(R.string.home_deadlines))
                 if (due.isEmpty()) Text(stringResource(R.string.home_deadlines_none), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -475,11 +501,29 @@ private fun HomeScreen(vm: VaultViewModel, onLock: () -> Unit) {
 }
 
 @Composable
-private fun StatTile(value: String, label: String, modifier: Modifier = Modifier, alert: Boolean = false) {
+private fun StatTile(value: String, label: String, icon: ImageVector, modifier: Modifier = Modifier, alert: Boolean = false) {
+    val accent = if (alert) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
     Panel(modifier) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(value, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold, color = if (alert) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(Modifier.size(32.dp).clip(CircleShape).background(accent.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = accent)
+            }
+            Text(value, style = MaterialTheme.typography.headlineSmall, color = accent)
             Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/** État vide : une icône, un titre, une phrase. */
+@Composable
+private fun EmptyState(icon: ImageVector, title: String, body: String) {
+    Panel {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 28.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(Modifier.size(64.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(30.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+            }
+            Text(title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+            Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         }
     }
 }
@@ -507,8 +551,8 @@ private fun ListScreen(vm: VaultViewModel) {
         }
         val results = vm.results()
         when {
-            vm.state.records.isEmpty() -> InfoCard(stringResource(R.string.home_empty_title), stringResource(R.string.home_empty_body))
-            results.isEmpty() -> InfoCard(stringResource(R.string.list_no_result_title), stringResource(R.string.list_no_result_body))
+            vm.state.records.isEmpty() -> EmptyState(Icons.Filled.FileCopy, stringResource(R.string.home_empty_title), stringResource(R.string.home_empty_body))
+            results.isEmpty() -> EmptyState(Icons.Filled.Search, stringResource(R.string.list_no_result_title), stringResource(R.string.list_no_result_body))
             else -> {
                 Text(
                     pluralStringResource(R.plurals.list_results, results.size, results.size),
@@ -795,7 +839,7 @@ private fun ViewerScreen(vm: VaultViewModel, attachmentId: String) {
                         stringResource(R.string.viewer_page, v.index + 1, v.count),
                         Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },
                         style = MaterialTheme.typography.titleSmall,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        textAlign = TextAlign.Center,
                     )
                     TextButton(onClick = { vm.showPdfPage(v.index + 1) }, enabled = v.index < v.count - 1, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.viewer_next)) }
                 }

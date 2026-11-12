@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Mes Papiers</string>
+    <!-- Nom affiché dans l’interface, identique dans toutes les variantes. -->
+    <string name="brand_name" translatable="false">Mes Papiers</string>
     <string name="app_subtitle">Tes pièces d’identité, diplômes et documents importants</string>
-    <string name="demo_banner">DÉMO</string>
+    <string name="demo_banner">VERSION DE DÉMONSTRATION</string>
     <string name="working">Un instant…</string>
     <string name="action_continue">Continuer</string>
     <string name="action_back">Retour</string>
@@ -109,7 +111,7 @@
 
     <!-- Scan et lecture automatique -->
     <string name="scan_action">Scanner un document</string>
-    <string name="scan_pitch">Scanne le document : les bords sont détectés, tu ajustes les coins si besoin, puis Mes Papiers le lit sur ton téléphone et prépare la fiche. Tu vérifies, tu corriges, tu enregistres.</string>
+    <string name="scan_pitch">Scanne ton document : il est cadré, lu sur ton téléphone, et la fiche est préparée pour toi.</string>
     <string name="scan_manual">Saisir à la main, sans scanner</string>
     <string name="scan_source_hint">Le scanner détecte les bords du document, le redresse et te laisse ajuster les coins. À la toute première utilisation, le téléphone peut avoir besoin d’une connexion pour installer le module de scan de Google.</string>
     <string name="scan_with_camera">Scanner avec l’appareil photo</string>

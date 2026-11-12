@@ -10,6 +10,19 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.offset
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FileCopy
+import androidx.compose.material.icons.filled.WarningAmber
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Typography
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -74,7 +87,7 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
 
-private val Petrol = Color(0xFF0F4C5C)
+internal val Petrol = Color(0xFF0F4C5C)
 private val Mint = Color(0xFF5FD3A6)
 
 // Contrastes calculés selon WCAG (AA : texte normal ≥ 4,5:1) :
@@ -121,9 +134,24 @@ private val DarkColors = darkColorScheme(
     error = Color(0xFFF2B8B5),
 )
 
+// Titres plus affirmés et texte courant moins espacé que les valeurs par défaut de Material.
+private val AppTypography = Typography().let { t ->
+    t.copy(
+        headlineMedium = t.headlineMedium.copy(fontWeight = FontWeight.SemiBold),
+        headlineSmall = t.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
+        titleLarge = t.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+        titleMedium = t.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+        titleSmall = t.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+        bodyLarge = t.bodyLarge.copy(letterSpacing = 0.15.sp),
+        bodyMedium = t.bodyMedium.copy(letterSpacing = 0.1.sp, lineHeight = 21.sp),
+    )
+}
+
+internal val BrandGradient = Brush.linearGradient(listOf(Color(0xFF0B3C49), Color(0xFF14677A)))
+
 @Composable
 fun MesPapiersTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = if (isSystemInDarkTheme()) DarkColors else LightColors, content = content)
+    MaterialTheme(colorScheme = if (isSystemInDarkTheme()) DarkColors else LightColors, typography = AppTypography, content = content)
 }
 
 @Composable
@@ -150,24 +178,26 @@ fun AppRoot(vm: AccessViewModel, vault: VaultViewModel) {
                 } else {
                     // Dès que la session n'est plus ouverte, plus rien du coffre ne reste à l'écran.
                     LaunchedEffect(Unit) { vault.reset() }
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-                        Column(
-                            Modifier
-                                .widthIn(max = 560.dp)
-                                .fillMaxWidth()
-                                .verticalScroll(rememberScrollState())
-                                .padding(horizontal = 20.dp, vertical = 24.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
+                        AccessHero()
+                        // Le formulaire est une carte qui chevauche le bandeau de marque.
+                        Surface(
+                            modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(horizontal = 16.dp).offset(y = (-36).dp),
+                            shape = RoundedCornerShape(24.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            shadowElevation = 6.dp,
                         ) {
-                            when (val s = vm.screen) {
-                                Screen.Loading -> BusyRow()
-                                Screen.Intro -> IntroScreen(vm)
-                                Screen.CreatePassphrase -> CreatePassphraseScreen(vm)
-                                is Screen.Enroll -> EnrollScreen(vm, s)
-                                Screen.Passphrase -> PassphraseScreen(vm)
-                                Screen.Totp -> TotpScreen(vm)
-                                Screen.Home -> Unit
-                                Screen.Unreadable -> UnreadableScreen()
+                            Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                when (val s = vm.screen) {
+                                    Screen.Loading -> BusyRow()
+                                    Screen.Intro -> IntroScreen(vm)
+                                    Screen.CreatePassphrase -> CreatePassphraseScreen(vm)
+                                    is Screen.Enroll -> EnrollScreen(vm, s)
+                                    Screen.Passphrase -> PassphraseScreen(vm)
+                                    Screen.Totp -> TotpScreen(vm)
+                                    Screen.Home -> Unit
+                                    Screen.Unreadable -> UnreadableScreen()
+                                }
                             }
                         }
                     }
@@ -177,29 +207,59 @@ fun AppRoot(vm: AccessViewModel, vault: VaultViewModel) {
     }
 }
 
+/** Bandeau « DÉMO » permanent de la variante de démonstration : fin, mais toujours visible. */
 @Composable
 internal fun DemoBanner() {
     Text(
         stringResource(R.string.demo_banner),
-        Modifier.fillMaxWidth().background(Color(0xFFB3261E)).padding(4.dp),
-        color = Color.White,
+        Modifier.fillMaxWidth().background(Color(0xFFFFE9C2)).padding(vertical = 3.dp),
+        color = Color(0xFF5A3D00),
         textAlign = TextAlign.Center,
-        style = MaterialTheme.typography.labelLarge,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 1.5.sp,
     )
 }
 
 // ------------------------------------------------------------ briques communes
 
+/** Emblème : feuilles superposées. */
 @Composable
-internal fun Brand() {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            stringResource(R.string.app_name),
-            Modifier.semantics { heading() },
-            style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Text(stringResource(R.string.app_subtitle), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+internal fun LogoMark(size: Dp, onDark: Boolean) {
+    Box(
+        Modifier.size(size).clip(RoundedCornerShape(size * 0.28f)).background(if (onDark) Color.White else Petrol),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Icons.Filled.FileCopy, contentDescription = null, modifier = Modifier.size(size * 0.56f), tint = if (onDark) Petrol else Color.White)
+    }
+}
+
+/** Bandeau de marque des écrans d'accès. */
+@Composable
+internal fun AccessHero() {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
+            .background(BrandGradient)
+            .padding(start = 24.dp, end = 24.dp, top = 36.dp, bottom = 68.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            LogoMark(68.dp, onDark = true)
+            Text(
+                stringResource(R.string.brand_name),
+                Modifier.semantics { heading() },
+                style = MaterialTheme.typography.headlineMedium,
+                color = Color.White,
+            )
+            Text(
+                stringResource(R.string.app_subtitle),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(alpha = 0.86f),
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 
@@ -208,39 +268,39 @@ internal fun Title(text: String) {
     Text(text, Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineSmall)
 }
 
+/** Encart d'information ; [warning] le met en évidence (ambre, icône d'alerte). */
 @Composable
 internal fun InfoCard(title: String, body: String, warning: Boolean = false) {
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (warning) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surface,
-            contentColor = if (warning) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurface,
-        ),
-    ) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(body, style = MaterialTheme.typography.bodyMedium)
+    val container = if (warning) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+    val content = if (warning) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSurface
+    Surface(shape = RoundedCornerShape(16.dp), color = container, contentColor = content) {
+        Row(Modifier.fillMaxWidth().padding(14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Icon(if (warning) Icons.Filled.WarningAmber else Icons.Outlined.Info, contentDescription = null, modifier = Modifier.padding(top = 2.dp).size(22.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(title, style = MaterialTheme.typography.titleSmall)
+                Text(body, style = MaterialTheme.typography.bodyMedium)
+            }
         }
     }
 }
 
 @Composable
 internal fun WideButton(text: String, enabled: Boolean = true, onClick: () -> Unit) {
-    Button(onClick, Modifier.fillMaxWidth().heightIn(min = 52.dp), enabled = enabled, shape = RoundedCornerShape(16.dp)) {
+    Button(onClick, Modifier.fillMaxWidth().heightIn(min = 52.dp), enabled = enabled, shape = RoundedCornerShape(14.dp)) {
         Text(text, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
     }
 }
 
 @Composable
 internal fun WideOutlinedButton(text: String, enabled: Boolean = true, onClick: () -> Unit) {
-    OutlinedButton(onClick, Modifier.fillMaxWidth().heightIn(min = 52.dp), enabled = enabled, shape = RoundedCornerShape(16.dp)) {
+    OutlinedButton(onClick, Modifier.fillMaxWidth().heightIn(min = 52.dp), enabled = enabled, shape = RoundedCornerShape(14.dp)) {
         Text(text, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
     }
 }
 
 @Composable
 internal fun BusyRow(text: String = stringResource(R.string.working)) {
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         CircularProgressIndicator()
         Text(text, Modifier.semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
     }
@@ -315,7 +375,6 @@ internal fun formatDuration(ms: Long): String {
 
 @Composable
 internal fun IntroScreen(vm: AccessViewModel) {
-    Brand()
     Title(stringResource(R.string.intro_title))
     Text(stringResource(R.string.intro_body), style = MaterialTheme.typography.bodyLarge)
     if (!vm.deviceSecure) InfoCard(stringResource(R.string.intro_no_lock_title), stringResource(R.string.intro_no_lock_body), warning = true)
@@ -407,7 +466,6 @@ internal fun EnrollScreen(vm: AccessViewModel, state: Screen.Enroll) {
 internal fun PassphraseScreen(vm: AccessViewModel) {
     var passphrase by remember { mutableStateOf("") }
     val waiting = vm.waitMs > 0
-    Brand()
     Title(stringResource(R.string.login_title))
     Text(stringResource(if (SecondFactor.AUTOMATIC) R.string.demo_login_step else R.string.login_step1), style = MaterialTheme.typography.bodyLarge)
     SecretField(passphrase, { passphrase = it }, stringResource(R.string.create_field), !vm.busy && !waiting, ImeAction.Done) {
@@ -433,7 +491,6 @@ internal fun PassphraseScreen(vm: AccessViewModel) {
 @Composable
 internal fun TotpScreen(vm: AccessViewModel) {
     var code by remember { mutableStateOf("") }
-    Brand()
     Title(stringResource(R.string.login_title))
     Text(stringResource(R.string.login_step2), style = MaterialTheme.typography.bodyLarge)
     // L'écran n'affiche jamais le code attendu.
@@ -453,6 +510,5 @@ internal fun TotpScreen(vm: AccessViewModel) {
 
 @Composable
 internal fun UnreadableScreen() {
-    Brand()
     InfoCard(stringResource(R.string.vault_unreadable_title), stringResource(R.string.vault_unreadable), warning = true)
 }
