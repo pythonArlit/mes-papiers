@@ -58,8 +58,11 @@ class ScreenshotTour {
         settle(500)
     }
 
+    private fun visibleTexts(): String =
+        device.findObjects(By.textContains("")).take(40).joinToString(" | ") { "${it.text} ${it.visibleBounds.toShortString()}" }
+
     private fun waitFor(selector: BySelector, timeout: Long = 20_000) {
-        if (!device.wait(Until.hasObject(selector), timeout)) throw AssertionError("jamais affiché : $selector")
+        if (!device.wait(Until.hasObject(selector), timeout)) throw AssertionError("jamais affiché : $selector ; à l'écran : " + visibleTexts())
     }
 
     /** Appuie sur l'élément, en faisant défiler l'écran s'il n'est pas visible. */
@@ -79,7 +82,7 @@ class ScreenshotTour {
             }
             scrollDown()
         }
-        throw AssertionError("introuvable : $selector")
+        throw AssertionError("introuvable : $selector ; à l'écran : " + visibleTexts())
     }
 
     private fun type(vararg values: String) {
@@ -196,7 +199,7 @@ class ScreenshotTour {
         scrollDown()
         shot("accueil-suite")
 
-        tap(By.textStartsWith("Voir et rechercher"))
+        tap(By.textContains("Voir et rechercher"))
         waitFor(By.text("Tous les documents"))
         shot("liste")
         tap(By.text("Carte nationale d'identité"))

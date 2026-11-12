@@ -410,10 +410,7 @@ private fun HomeScreen(vm: VaultViewModel, onLock: () -> Unit) {
                     Box(Modifier.size(44.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
                         Icon(Icons.Filled.DocumentScanner, contentDescription = null, tint = Color.White)
                     }
-                    Column {
-                        Text(stringResource(R.string.home_add), style = MaterialTheme.typography.titleLarge, color = Color.White)
-                        Text(stringResource(R.string.app_subtitle), style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.8f))
-                    }
+                    Text(stringResource(R.string.home_add), style = MaterialTheme.typography.titleLarge, color = Color.White)
                 }
                 if (vm.scanning) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
