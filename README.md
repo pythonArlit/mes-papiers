@@ -24,6 +24,8 @@ Application Android individuelle et hors connexion pour conserver et retrouver p
 | J4 Sauvegarde et restauration | Format fait et testé | À faire |
 | J5 Recette et revue MASVS | 104 tests JVM, contrôle par mutation | 23 tests instrumentés ; recette manuelle à faire |
 
+Des captures d'écran de la démo (données fictives) sont publiées par la CI sur la branche `captures`.
+
 Chaque poussée sur `main` déclenche la CI : tests du noyau, lint, APK `demo` et `prod`, contrôle de l'APK `prod`, tests sur émulateur. L'APK de démonstration est téléchargeable dans les artefacts de l'exécution (`apk-demo`).
 
 ## Organisation du dépôt
