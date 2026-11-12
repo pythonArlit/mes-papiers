@@ -35,6 +35,7 @@ Chaque décision indique son état : **en place** (code écrit et testé sur JVM
 | Room | 2.8.4 |
 | ZXing core (QR hors ligne) | 3.5.3 |
 | ML Kit text-recognition (modèle latin embarqué) | 16.0.1 |
+| play-services-mlkit-document-scanner | 16.0.0 |
 | Compose material-icons-extended | version du BOM |
 | androidx.exifinterface (orientation des photos) | 1.3.7 |
 | Bouncy Castle `bcprov-jdk18on` | 1.78.1 |
@@ -144,8 +145,16 @@ Le cahier des charges plaçait « OCR ou extraction automatique de champs » hor
 - **Prudence sur les identifiants.** Une zone lisible par machine n'est utilisée que si au moins deux de ses clés de contrôle sont justes ; un IBAN n'est proposé que si sa clé est juste. Mieux vaut un champ vide qu'un numéro faux.
 - Le texte reconnu n'est jamais stocké : seuls les champs validés le sont, chiffrés comme les autres.
 
-**D-30 — Redressement et recadrage du scan.** *En place, testé sur émulateur.*
+**D-30 — Redressement et recadrage du scan.** *Redressement en place ; recadrage désactivé par D-32.*
 Demandé par le commanditaire après un essai sur une vraie carte. À l'ajout d'une photo : le texte est reconnu, l'image est remise à l'endroit d'après l'inclinaison du texte (avec essai des autres sens si presque rien n'est lu), puis rognée sur le document. Le rectangle du document est cherché dans le noyau (`DocumentCropper`, Kotlin pur) : plus grande zone d'un seul tenant qui se détache du fond, acceptée seulement si elle contient l'essentiel du texte ; à défaut, la zone de texte avec une marge. Aucune bibliothèque de plus, rien ne sort du téléphone. Limite assumée : pas de correction de perspective. L'alternative écartée pour l'instant est le scanner de documents des services Google Play, qui corrige la perspective mais exige ces services, télécharge un module, ne s'applique pas aux fichiers importés et ne peut pas être testé par la CI.
+
+**D-32 — Scanner de documents de Google (ML Kit), recadrage maison désactivé.** *Intégré et compilé ; jamais exécuté.*
+Après essai sur son téléphone, le commanditaire a jugé le recadrage automatique de D-30 incorrect et demandé (12/11/2026) « la même technologie que CamScanner ». Celle de CamScanner est propriétaire ; l'équivalent retenu est le scanner de documents de ML Kit (`play-services-mlkit-document-scanner` 16.0.0) : appareil photo avec détection des bords, coins ajustables à la main, correction de perspective, filtres, import depuis la galerie. Une page par scan, résultat en JPEG.
+- **Ce que cela change par rapport au cahier des charges.** Le scanner est fourni par les services Google Play, qui téléchargent son module à la première utilisation : il faut donc ces services, au moins 1,7 Go de RAM, et une connexion du téléphone une première fois. L'image du document passe par l'interface des services Google Play. L'application elle-même n'a toujours ni `INTERNET` ni `CAMERA` (contrôlé sur l'APK).
+- **Repli.** Scanner indisponible : appareil photo du système, image redressée mais non recadrée.
+- **Recadrage maison (D-30) désactivé** dans l'application : un mauvais recadrage abîme un document dont l'original n'est pas conservé. `DocumentCropper` reste dans le noyau avec ses tests, inutilisé.
+- **Copie en clair temporaire.** Le scanner écrit son image dans le cache privé de l'application ; elle est effacée dès qu'elle est chiffrée dans le coffre ou en cas d'échec, et au démarrage suivant si l'application a été tuée entre-temps.
+- Les PDF et les images choisis par le sélecteur de fichiers ne passent pas par le scanner.
 
 **D-31 — Valeurs rattachées aux libellés par leur position.** *En place.* La lecture utilise la position des lignes reconnues : la valeur d'un champ est ce qui suit le libellé sur sa ligne, sinon la ligne à sa droite, sinon celle du dessous dans la même colonne. Les libellés sont reconnus en français et en anglais, y compris sur une même ligne (« Prénoms/ GivenNames »), et ne sont jamais pris pour des valeurs.
 

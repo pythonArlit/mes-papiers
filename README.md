@@ -5,6 +5,7 @@
 > - L'application se compile et s'installe, mais elle est **incomplète** : pas de partage, pas de rappels, **pas de sauvegarde**. Sans sauvegarde, perdre le téléphone ou un facteur d'accès, c'est tout perdre.
 > - La variante `demo` ne demande **pas** le code de l'application d'authentification (raccourci de démonstration) : elle n'a que la protection de la phrase secrète.
 > - L'interface n'a été vérifiée par aucun test ni sur aucun téléphone réel.
+> - Le scanner de documents (détection des bords, coins ajustables) dépend des services Google Play et n'a jamais été exécuté : il compile, sans plus.
 > - La lecture automatique des documents propose des valeurs qui peuvent être fausses : elle n'a pas été essayée sur de vrais documents. Tout est à relire avant d'enregistrer.
 > - Le chiffrement n'utilise pas Tink mais AES-256-GCM de la plateforme avec une construction en flux propre au projet, non relue par un tiers.
 >
