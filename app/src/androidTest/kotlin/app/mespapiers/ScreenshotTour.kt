@@ -11,6 +11,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.BySelector
+import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import app.mespapiers.core.model.AttachmentRole
@@ -58,9 +59,12 @@ class ScreenshotTour {
         settle(500)
     }
 
-    private fun visibleTexts(): String =
+    private fun visibleTexts(): String = try {
         device.findObjects(By.pkg(context.packageName)).filter { it.text != null || it.contentDescription != null }.take(60)
             .joinToString(" | ") { "${it.text ?: ""}/${it.contentDescription ?: ""} ${it.visibleBounds.toShortString()}" }
+    } catch (e: StaleObjectException) {
+        "(écran en cours de mise à jour)"
+    }
 
     private fun waitFor(selector: BySelector, timeout: Long = 20_000) {
         if (!device.wait(Until.hasObject(selector), timeout)) throw AssertionError("jamais affiché : $selector ; à l'écran : " + visibleTexts())
@@ -70,26 +74,39 @@ class ScreenshotTour {
     private fun tap(selector: BySelector, timeout: Long = 20_000) {
         val end = SystemClock.uptimeMillis() + timeout
         while (SystemClock.uptimeMillis() < end) {
-            val o = device.findObject(selector)
-            if (o == null) {
+            // L'écran se redessine (aperçus qui arrivent) : un élément trouvé peut ne plus exister l'instant d'après.
+            try {
+                val o = device.findObject(selector)
+                if (o == null) {
+                    SystemClock.sleep(300)
+                    continue
+                }
+                val b = o.visibleBounds
+                if (b.height() > 20 && b.centerY() in 120 until device.displayHeight - 120) {
+                    o.click()
+                    settle()
+                    return
+                }
+                scrollDown()
+            } catch (e: StaleObjectException) {
                 SystemClock.sleep(300)
-                continue
             }
-            val b = o.visibleBounds
-            if (b.height() > 20 && b.centerY() in 120 until device.displayHeight - 120) {
-                o.click()
-                settle()
-                return
-            }
-            scrollDown()
         }
         throw AssertionError("introuvable : $selector ; à l'écran : " + visibleTexts())
     }
 
     private fun type(vararg values: String) {
         waitFor(By.clazz("android.widget.EditText"))
-        val fields = device.findObjects(By.clazz("android.widget.EditText"))
-        values.forEachIndexed { i, v -> fields[i].text = v }
+        repeat(3) {
+            try {
+                val fields = device.findObjects(By.clazz("android.widget.EditText"))
+                values.forEachIndexed { i, v -> fields[i].text = v }
+                settle(400)
+                return
+            } catch (e: StaleObjectException) {
+                SystemClock.sleep(400)
+            }
+        }
         settle(400)
     }
 

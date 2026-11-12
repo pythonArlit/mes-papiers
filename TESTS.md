@@ -68,7 +68,7 @@ Statuts : **exécuté et réussi**, **exécuté et en échec**, **non exécuté*
 | **Manifeste et variantes** | Script sur l'APK `prod` | **Exécuté et réussi** | `tools/check-apk.sh` : pas d'`INTERNET`, liste blanche, non débogable, `allowBackup=false`, règles d'extraction, un seul composant exporté, aucun élément de démonstration | CI |
 | | Instrumenté | **Exécuté et réussi** | `KeystoreGateTest.manifeste_installe_sans_internet_ni_sauvegarde` | Émulateur, Android 14 |
 | | Sauvegarde et transfert d'appareil réels | **Non exécuté** | — | — |
-| **Interfaces** | Visite guidée automatique avec captures d'écran | **Exécuté et réussi** (dernière exécution ; instable, un échec sur trois essais) | `ScreenshotTour` : configuration, connexion, accueil, liste, fiche, modification, visionneuse, choix du scan ; captures sur la branche `captures` | Émulateur Pixel 6, Android 14 |
+| **Interfaces** | Visite guidée automatique avec captures d'écran | **Exécuté et réussi** (deux échecs sur des essais précédents, dus à un écran en cours de mise à jour ; corrigé) | `ScreenshotTour` : configuration, connexion, accueil, liste, fiche, modification, visionneuse, choix du scan ; captures sur la branche `captures` | Émulateur Pixel 6, Android 14 |
 | | Compact, paysage, clavier, texte à 200 %, TalkBack, thème sombre | **Non exécuté** | — | — |
 
 ## Commandes

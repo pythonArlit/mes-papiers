@@ -15,7 +15,7 @@ Tout ce qui est incomplet, non vérifié ou différent du cahier des charges. **
 | J5 Recette | Tests JVM et instrumentés automatiques | Recette manuelle, accessibilité, captures d'écran |
 
 **E-08 — Interface vue sur émulateur seulement.**
-Depuis le 12/11/2026, une visite guidée automatique (`ScreenshotTour`) pilote la vraie interface de la démo sur l'émulateur de la CI et publie 14 captures d'écran (données fictives) sur la branche `captures`. Les écrans d'accès, l'accueil, la liste, la fiche, la modification, la visionneuse et le choix du scan ont ainsi été vus et retravaillés. Restent non vérifiés : le thème sombre, le paysage, le clavier ouvert, le texte à 200 %, TalkBack, les petits écrans, et tout ce qui dépend d'un vrai téléphone (scanner de Google, sélecteur de fichiers). La visite guidée s'est montrée instable une fois sur trois ; son échec ne fait pas échouer la CI.
+Depuis le 12/11/2026, une visite guidée automatique (`ScreenshotTour`) pilote la vraie interface de la démo sur l'émulateur de la CI et publie 14 captures d'écran (données fictives) sur la branche `captures`. Les écrans d'accès, l'accueil, la liste, la fiche, la modification, la visionneuse et le choix du scan ont ainsi été vus et retravaillés. Restent non vérifiés : le thème sombre, le paysage, le clavier ouvert, le texte à 200 %, TalkBack, les petits écrans, et tout ce qui dépend d'un vrai téléphone (scanner de Google, sélecteur de fichiers). L'échec de la visite guidée ne fait pas échouer la CI : vérifier son résultat dans le résumé des tests.
 
 ## Écarts de conception
 
