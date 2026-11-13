@@ -4,7 +4,10 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -209,6 +212,7 @@ fun AppRoot(vm: AccessViewModel, vault: VaultViewModel) {
                                     Screen.Passphrase -> PassphraseScreen(vm)
                                     Screen.Totp -> TotpScreen(vm)
                                     Screen.Home -> Unit
+                                    Screen.Restore -> RestoreScreen(vm)
                                     Screen.Unreadable -> UnreadableScreen()
                                 }
                             }
@@ -399,12 +403,16 @@ internal fun IntroScreen(vm: AccessViewModel) {
         InfoCard(stringResource(R.string.intro_same_device_title), stringResource(R.string.intro_same_device_body))
     }
     WideButton(stringResource(R.string.intro_start)) { vm.startSetup() }
+    WideOutlinedButton(stringResource(R.string.restore_action)) { vm.startRestore() }
 }
 
 @Composable
 internal fun CreatePassphraseScreen(vm: AccessViewModel) {
     var passphrase by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
+    vm.restoredCount?.let { count ->
+        InfoCard(stringResource(R.string.restore_ready_title), pluralStringResource(R.plurals.restore_ready_body, count, count))
+    }
     Title(stringResource(R.string.create_title))
     Text(stringResource(R.string.create_body), style = MaterialTheme.typography.bodyLarge)
     SecretField(passphrase, { passphrase = it }, stringResource(R.string.create_field), !vm.busy, ImeAction.Next)
@@ -424,6 +432,7 @@ internal fun CreatePassphraseScreen(vm: AccessViewModel) {
     MessageLine(vm.message)
     if (vm.busy) BusyRow(stringResource(R.string.create_preparing))
     WideButton(stringResource(R.string.action_continue), enabled = !vm.busy) { vm.createPassphrase(passphrase, confirmation) }
+    WideOutlinedButton(stringResource(R.string.action_back), enabled = !vm.busy) { vm.backToIntro() }
 }
 
 /** QR généré localement (ZXing), sans aucun service distant. */
@@ -524,4 +533,46 @@ internal fun TotpScreen(vm: AccessViewModel) {
 @Composable
 internal fun UnreadableScreen() {
     InfoCard(stringResource(R.string.vault_unreadable_title), stringResource(R.string.vault_unreadable), warning = true)
+}
+
+// ------------------------------------------------------------ restauration
+
+/** Champ de saisie d'une phrase de récupération : majuscules, sans correction ni suggestion. */
+@Composable
+internal fun RecoveryPhraseField(value: String, onChange: (String) -> Unit, enabled: Boolean) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onChange,
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text(stringResource(R.string.recovery_phrase_field)) },
+        placeholder = { Text(stringResource(R.string.recovery_phrase_placeholder)) },
+        enabled = enabled,
+        textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace),
+        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, autoCorrectEnabled = false, keyboardType = KeyboardType.Password),
+        shape = RoundedCornerShape(16.dp),
+    )
+}
+
+@Composable
+internal fun RestoreScreen(vm: AccessViewModel) {
+    var uri by remember { mutableStateOf<Uri?>(null) }
+    var phrase by remember { mutableStateOf("") }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { picked -> if (picked != null) uri = picked }
+    Title(stringResource(R.string.restore_title))
+    Text(stringResource(R.string.restore_body), style = MaterialTheme.typography.bodyLarge)
+    WideOutlinedButton(stringResource(if (uri == null) R.string.restore_pick else R.string.restore_picked), enabled = !vm.busy) {
+        try {
+            picker.launch(arrayOf("*/*"))
+        } catch (e: ActivityNotFoundException) {
+            vm.onNoAuthenticatorApp()
+        }
+    }
+    RecoveryPhraseField(phrase, { phrase = it }, !vm.busy)
+    MessageLine(vm.message)
+    if (vm.busy) BusyRow(stringResource(R.string.restore_working))
+    val chosen = uri
+    WideButton(stringResource(R.string.restore_start), enabled = !vm.busy && chosen != null && phrase.isNotBlank()) {
+        if (chosen != null) vm.restoreFrom(chosen, phrase)
+    }
+    WideOutlinedButton(stringResource(R.string.action_back), enabled = !vm.busy) { vm.backToIntro() }
 }

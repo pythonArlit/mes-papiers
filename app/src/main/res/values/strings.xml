@@ -25,7 +25,7 @@
     <string name="intro_two_steps_title">Deux étapes pour ouvrir</string>
     <string name="intro_two_steps_body">Tu choisis une phrase secrète, puis tu associes une application d’authentification (Aegis, Google Authenticator, FreeOTP…) qui te donnera un code à six chiffres à chaque ouverture.</string>
     <string name="intro_no_reset_title">Aucune réinitialisation possible</string>
-    <string name="intro_no_reset_body">Il n’existe ni code de secours ni « mot de passe oublié ». Si tu oublies ta phrase ou perds ton application d’authentification, la seule solution sera de réinstaller Mes Papiers puis de restaurer une archive de sauvegarde avec ta phrase de récupération. Sans archive ou sans phrase de récupération, tes documents sont perdus.</string>
+    <string name="intro_no_reset_body">Il n’existe ni code de secours ni « mot de passe oublié ». Si tu oublies ta phrase ou perds ton application d’authentification, la seule solution sera de réinstaller Mes Papiers puis de restaurer une archive de sauvegarde avec ta phrase de récupération. Sans archive ou sans phrase de récupération, tes documents sont perdus. Une archive ancienne ne contient pas les documents ajoutés depuis : pense à en refaire une régulièrement.</string>
     <string name="intro_same_device_title">Deux téléphones, c’est mieux</string>
     <string name="intro_same_device_body">Si l’application d’authentification est sur ce même téléphone, une personne qui le tient déverrouillé n’a plus qu’à connaître ta phrase. Pour mieux séparer les deux étapes, installe l’application d’authentification sur un autre appareil.</string>
     <string name="intro_no_lock_title">Ce téléphone n’a pas de verrouillage d’écran</string>
@@ -210,6 +210,64 @@
     <string name="warn_iban_format">Cela ne ressemble pas à un IBAN. Tu peux quand même l’enregistrer.</string>
     <string name="warn_iban_checksum">La clé de contrôle de cet IBAN ne correspond pas. Vérifie la saisie ; tu peux quand même l’enregistrer.</string>
     <string name="warn_rib">Longueur ou caractères inhabituels pour un RIB. Tu peux quand même l’enregistrer.</string>
+
+    <!-- Sauvegarde -->
+    <string name="backup_title">Sauvegarde</string>
+    <string name="backup_last_label">Dernière sauvegarde</string>
+    <string name="backup_last_never">Aucune pour l’instant</string>
+    <string name="backup_why_title">Pourquoi sauvegarder</string>
+    <string name="backup_why_body">L’archive est ta seule issue si tu perds ce téléphone, ta phrase secrète ou ton application d’authentification. Elle est chiffrée : sans ta phrase de récupération, personne ne peut la lire, toi non plus. Une archive ancienne ne contient pas les documents ajoutés depuis : refais-en une régulièrement et garde-la ailleurs que sur ce téléphone.</string>
+    <string name="backup_no_phrase">Pour sauvegarder, il te faut d’abord une phrase de récupération. Mes Papiers la crée pour toi ; elle servira à ouvrir tes archives.</string>
+    <string name="backup_create_phrase">Créer ma phrase de récupération</string>
+    <string name="backup_phrase_title">Ta phrase de récupération</string>
+    <string name="backup_note_title">Note-la maintenant, sur papier</string>
+    <string name="backup_note_body">Elle ne sera plus jamais affichée et n’est pas gardée sur ce téléphone. Si tu perds le téléphone et cette phrase, tes documents sont perdus. Ne la range pas avec le téléphone.</string>
+    <string name="backup_noted">Je l’ai notée</string>
+    <string name="backup_confirm_title">Vérifions</string>
+    <string name="backup_confirm_body">Saisis la phrase que tu viens de noter. Les tirets et les majuscules ne comptent pas.</string>
+    <string name="backup_confirm_action">Valider</string>
+    <string name="backup_phrase_mismatch">Ce n’est pas la phrase affichée. Reviens en arrière pour la revoir, ou corrige ta saisie.</string>
+    <string name="backup_phrase_saved">Phrase de récupération enregistrée. Tu peux maintenant faire ta première sauvegarde.</string>
+    <string name="backup_enter_phrase">Saisis ta phrase de récupération pour créer l’archive. C’est aussi l’occasion de vérifier que tu l’as toujours.</string>
+    <string name="backup_export">Créer une archive</string>
+    <string name="backup_new_phrase">J’ai perdu ma phrase : en créer une nouvelle</string>
+    <string name="backup_phrase_wrong">Ce n’est pas ta phrase de récupération. Vérifie ta saisie.</string>
+    <string name="backup_exporting">Sauvegarde en cours : %1$s</string>
+    <string name="backup_cancel">Annuler la sauvegarde</string>
+    <string name="backup_cancelled">Sauvegarde annulée. Aucune archive n’a été créée.</string>
+    <string name="backup_failed">La sauvegarde n’a pas abouti. Aucune archive n’a été créée ; vérifie l’espace disponible et réessaie.</string>
+    <string name="backup_done">Archive enregistrée : %1$d documents, %2$d pièces jointes. Range-la ailleurs que sur ce téléphone.</string>
+    <string name="backup_done_unreadable">Attention : %1$d documents illisibles n’ont pas pu être sauvegardés.</string>
+    <string name="backup_reminder_never_title">Aucune sauvegarde</string>
+    <string name="backup_reminder_never_body">Sans sauvegarde, perdre ce téléphone ou ta phrase secrète, c’est perdre tes documents.</string>
+    <string name="backup_reminder_stale_title">Sauvegarde ancienne</string>
+    <string name="backup_reminder_stale_body">Ta dernière sauvegarde date du %1$s. Elle ne contient pas ce que tu as ajouté depuis.</string>
+    <string name="backup_reminder_action">Sauvegarder maintenant</string>
+    <string name="recovery_phrase_field">Phrase de récupération</string>
+    <string name="recovery_phrase_placeholder">XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX</string>
+
+    <!-- Restauration -->
+    <string name="restore_action">Restaurer une archive</string>
+    <string name="restore_title">Restaurer une archive</string>
+    <string name="restore_body">Choisis ton archive Mes Papiers et saisis ta phrase de récupération. Tu choisiras ensuite une nouvelle phrase secrète ; tes documents ne seront accessibles qu’après cette étape.</string>
+    <string name="restore_pick">Choisir l’archive</string>
+    <string name="restore_picked">Archive choisie (en choisir une autre)</string>
+    <string name="restore_start">Restaurer</string>
+    <string name="restore_working">Vérification et restauration de l’archive…</string>
+    <string name="restore_ready_title">Archive vérifiée</string>
+    <plurals name="restore_ready_body">
+        <item quantity="one">%1$d document est prêt. Choisis maintenant ta nouvelle phrase secrète pour y accéder.</item>
+        <item quantity="many">%1$d documents sont prêts. Choisis maintenant ta nouvelle phrase secrète pour y accéder.</item>
+        <item quantity="other">%1$d documents sont prêts. Choisis maintenant ta nouvelle phrase secrète pour y accéder.</item>
+    </plurals>
+    <string name="restore_phrase_format">Cette phrase de récupération est incomplète ou contient un caractère inattendu. Elle compte 28 lettres et chiffres.</string>
+    <string name="restore_bad_format">Ce fichier n’est pas une archive Mes Papiers. Rien n’a été restauré.</string>
+    <string name="restore_unknown_version">Cette archive a été créée par une version plus récente de Mes Papiers. Mets l’application à jour puis réessaie. Rien n’a été restauré.</string>
+    <string name="restore_wrong_phrase">Phrase de récupération incorrecte. Rien n’a été restauré.</string>
+    <string name="restore_corrupted">Cette archive est abîmée ou incomplète. Rien n’a été restauré.</string>
+    <string name="restore_too_big">Cette archive dépasse les limites acceptées. Rien n’a été restauré.</string>
+    <string name="restore_storage">Il n’y a pas assez d’espace sur le téléphone, ou l’archive n’a pas pu être lue jusqu’au bout. Rien n’a été restauré.</string>
+    <string name="restore_failed">La restauration n’a pas abouti. Rien n’a été restauré.</string>
 
     <!-- Pièces jointes -->
     <string name="attach_title">Pièces jointes</string>

@@ -39,6 +39,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.WarningAmber
+import app.mespapiers.BackupStep
+import app.mespapiers.core.docs.ExportReminder
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Badge
@@ -114,6 +118,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.mespapiers.DateText
 import app.mespapiers.Draft
 import app.mespapiers.DraftField
@@ -153,6 +158,7 @@ fun VaultRoot(vm: VaultViewModel, onLock: () -> Unit) {
         VaultScreen.PickCategory -> PickCategoryScreen(vm)
         VaultScreen.Edit -> vm.draft?.let { EditScreen(vm, it) }
         is VaultScreen.Viewer -> ViewerScreen(vm, s.attachmentId)
+        VaultScreen.Backup -> BackupScreen(vm)
     }
 }
 
@@ -399,6 +405,7 @@ private fun HomeScreen(vm: VaultViewModel, onLock: () -> Unit) {
         title = stringResource(R.string.brand_name),
         onBack = null,
         actions = {
+            IconButton(onClick = { vm.openBackup() }) { Icon(Icons.Filled.Archive, contentDescription = stringResource(R.string.backup_title)) }
             FilledTonalIconButton(onClick = onLock) { Icon(Icons.Filled.Lock, contentDescription = stringResource(R.string.home_lock)) }
             Spacer(Modifier.width(8.dp))
         },
@@ -440,6 +447,7 @@ private fun HomeScreen(vm: VaultViewModel, onLock: () -> Unit) {
         if (!vm.state.loaded) {
             BusyRow()
         } else {
+            if (vm.exportState() != ExportReminder.State.RECENT) BackupReminder(vm)
             if (vm.state.unreadable > 0) {
                 InfoCard(stringResource(R.string.home_unreadable_title), pluralStringResource(R.plurals.home_unreadable, vm.state.unreadable, vm.state.unreadable), warning = true)
             }
@@ -1061,6 +1069,114 @@ private fun CustomFieldEditor(vm: VaultViewModel, f: DraftField) {
                 Switch(checked = f.sensitive, onCheckedChange = { f.sensitive = it })
             }
             TextButton(onClick = { vm.removeField(f) }) { Text(stringResource(R.string.edit_remove_field)) }
+        }
+    }
+}
+
+// ------------------------------------------------------------ sauvegarde
+
+/** Rappel affiché sur l'accueil quand il n'y a pas de sauvegarde, ou qu'elle date. */
+@Composable
+private fun BackupReminder(vm: VaultViewModel) {
+    val never = vm.exportState() == ExportReminder.State.NEVER
+    Surface(shape = CardShape, color = MaterialTheme.colorScheme.tertiaryContainer, contentColor = MaterialTheme.colorScheme.onTertiaryContainer) {
+        Row(Modifier.fillMaxWidth().padding(start = 14.dp, top = 12.dp, end = 8.dp, bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Icon(Icons.Filled.WarningAmber, contentDescription = null, modifier = Modifier.padding(top = 2.dp).size(22.dp))
+            Column {
+                Text(stringResource(if (never) R.string.backup_reminder_never_title else R.string.backup_reminder_stale_title), style = MaterialTheme.typography.titleSmall)
+                Text(
+                    if (never) stringResource(R.string.backup_reminder_never_body) else stringResource(R.string.backup_reminder_stale_body, vm.lastExportText().orEmpty()),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                TextButton(onClick = { vm.openBackup() }, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.backup_reminder_action)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BackupNoteLine(vm: VaultViewModel) {
+    val note = vm.backupNote ?: return
+    Surface(shape = CardShape, color = if (note.isError) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer) {
+        Text(
+            note.text,
+            Modifier.fillMaxWidth().padding(16.dp).semantics { liveRegion = LiveRegionMode.Assertive },
+            color = if (note.isError) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer,
+            style = MaterialTheme.typography.bodyLarge,
+        )
+    }
+}
+
+@Composable
+private fun BackupScreen(vm: VaultViewModel) {
+    var typed by remember(vm.backupStep) { mutableStateOf("") }
+    val saver = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri -> vm.exportTo(uri) }
+    ScreenFrame(stringResource(R.string.backup_title), onBack = { vm.back() }) {
+        when (vm.backupStep) {
+            BackupStep.SHOW_PHRASE -> {
+                Text(stringResource(R.string.backup_phrase_title), Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineSmall)
+                InfoCard(stringResource(R.string.backup_note_title), stringResource(R.string.backup_note_body), warning = true)
+                Panel {
+                    // Non sélectionnable : la phrase ne doit pas passer par le presse-papiers.
+                    Text(
+                        vm.newPhrase.orEmpty().split('-').chunked(2).joinToString("\n") { it.joinToString("  ") },
+                        Modifier.fillMaxWidth().padding(20.dp),
+                        style = MaterialTheme.typography.headlineSmall.copy(fontFamily = FontFamily.Monospace, lineHeight = 40.sp),
+                        textAlign = TextAlign.Center,
+                    )
+                }
+                WideButton(stringResource(R.string.backup_noted)) { vm.phraseNoted() }
+            }
+            BackupStep.CONFIRM_PHRASE -> {
+                Text(stringResource(R.string.backup_confirm_title), Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineSmall)
+                Text(stringResource(R.string.backup_confirm_body), style = MaterialTheme.typography.bodyLarge)
+                RecoveryPhraseField(typed, { typed = it }, !vm.busy)
+                BackupNoteLine(vm)
+                if (vm.busy) BusyRow()
+                WideButton(stringResource(R.string.backup_confirm_action), enabled = !vm.busy && typed.isNotBlank()) { vm.confirmPhrase(typed) }
+            }
+            BackupStep.OVERVIEW -> {
+                Panel {
+                    Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Box(Modifier.size(44.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Filled.Archive, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+                        Column {
+                            Text(stringResource(R.string.backup_last_label), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(vm.lastExportText() ?: stringResource(R.string.backup_last_never), style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
+                }
+                InfoCard(stringResource(R.string.backup_why_title), stringResource(R.string.backup_why_body))
+                BackupNoteLine(vm)
+                val progress = vm.exportProgress
+                when {
+                    progress != null -> {
+                        BusyRow(stringResource(R.string.backup_exporting, formatSize(progress)))
+                        WideOutlinedButton(stringResource(R.string.backup_cancel)) { vm.cancelExport() }
+                    }
+                    !vm.hasRecoveryPhrase -> {
+                        Text(stringResource(R.string.backup_no_phrase), style = MaterialTheme.typography.bodyLarge)
+                        WideButton(stringResource(R.string.backup_create_phrase)) { vm.generatePhrase() }
+                    }
+                    else -> {
+                        Text(stringResource(R.string.backup_enter_phrase), style = MaterialTheme.typography.bodyLarge)
+                        RecoveryPhraseField(typed, { typed = it }, true)
+                        WideButton(stringResource(R.string.backup_export), enabled = typed.isNotBlank()) {
+                            if (vm.prepareExport(typed)) {
+                                typed = ""
+                                try {
+                                    saver.launch(vm.exportFileName())
+                                } catch (e: ActivityNotFoundException) {
+                                    vm.exportTo(null)
+                                    vm.onCameraMissing()
+                                }
+                            }
+                        }
+                        TextButton(onClick = { vm.generatePhrase() }, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.backup_new_phrase)) }
+                    }
+                }
+            }
         }
     }
 }

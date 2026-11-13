@@ -1,6 +1,12 @@
 package app.mespapiers
 
 import android.app.Application
+import android.net.Uri
+import android.provider.OpenableColumns
+import app.mespapiers.core.archive.ArchiveError
+import app.mespapiers.core.archive.ArchiveException
+import app.mespapiers.core.crypto.Aead
+import app.mespapiers.core.docs.RecoveryPhrase
 import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,6 +28,9 @@ sealed interface Screen {
     data object Loading : Screen
     data object Intro : Screen
     data object CreatePassphrase : Screen
+
+    /** Restauration d'une archive dans une installation vide. */
+    data object Restore : Screen
 
     /** La graine n'existe ici qu'en mémoire, le temps de l'enrôlement. */
     data class Enroll(val otpAuthUri: String, val manualKey: String) : Screen
@@ -112,7 +121,8 @@ class AccessViewModel(app: Application) : AndroidViewModel(app) {
         screen = try {
             when {
                 enrollment != null -> screen
-                !c.gate.isConfigured -> Screen.Intro
+                // Un retour du sélecteur de fichiers ne doit pas faire perdre l'écran en cours.
+                !c.gate.isConfigured -> if (screen == Screen.CreatePassphrase || screen == Screen.Restore) screen else Screen.Intro
                 c.gate.isOpen -> Screen.Home
                 c.gate.isAwaitingTotp -> Screen.Totp
                 else -> Screen.Passphrase
@@ -129,9 +139,92 @@ class AccessViewModel(app: Application) : AndroidViewModel(app) {
 
     // ------------------------------------------------------------ configuration
 
+    /** Nombre de documents d'une archive restaurée, en attente de la configuration du coffre. */
+    var restoredCount by mutableStateOf<Int?>(null)
+        private set
+
+    private fun discardRestore() {
+        restoredCount = null
+        if (c.pendingRestoreKey != null) viewModelScope.launch(Dispatchers.IO) { c.discardRestore() }
+    }
+
     fun startSetup() {
         message = null
+        discardRestore()
         screen = Screen.CreatePassphrase
+    }
+
+    fun startRestore() {
+        message = null
+        discardRestore()
+        screen = Screen.Restore
+    }
+
+    fun backToIntro() {
+        if (busy) return
+        message = null
+        discardRestore()
+        screen = Screen.Intro
+    }
+
+    /**
+     * Lit et vérifie l'archive, et prépare son contenu sous une clé neuve gardée en mémoire.
+     * Rien n'est accessible tant que la phrase d'accès et le code n'ont pas été configurés ;
+     * en cas d'erreur l'installation reste vide.
+     */
+    fun restoreFrom(uri: Uri, phrase: String) {
+        if (busy) return
+        val normalized = RecoveryPhrase.normalize(phrase.toCharArray())
+        if (normalized == null) {
+            message = UiMessage(R.string.restore_phrase_format)
+            return
+        }
+        busy = true
+        message = null
+        viewModelScope.launch {
+            try {
+                val count = withContext(Dispatchers.IO) {
+                    val resolver = c.appContext.contentResolver
+                    var size = -1L
+                    try {
+                        resolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { if (it.moveToFirst() && !it.isNull(0)) size = it.getLong(0) }
+                    } catch (e: Exception) {
+                        // Taille inconnue : l'espace sera vérifié à l'écriture.
+                    }
+                    if (size > 0 && c.attachments.usableSpace < size + 8L * 1024 * 1024) throw ArchiveException(ArchiveError.STORAGE)
+                    val input = resolver.openInputStream(uri) ?: throw ArchiveException(ArchiveError.BAD_FORMAT)
+                    val key = Aead.newKey()
+                    val summary = c.backup.restore(input.buffered(), normalized, key)
+                    c.pendingRestoreKey = key
+                    summary.records
+                }
+                restoredCount = count
+                screen = Screen.CreatePassphrase
+            } catch (e: ArchiveException) {
+                message = UiMessage(
+                    when (e.error) {
+                        ArchiveError.BAD_FORMAT -> R.string.restore_bad_format
+                        ArchiveError.UNKNOWN_VERSION -> R.string.restore_unknown_version
+                        ArchiveError.WRONG_SECRET -> R.string.restore_wrong_phrase
+                        ArchiveError.CORRUPTED -> R.string.restore_corrupted
+                        ArchiveError.LIMIT_EXCEEDED -> R.string.restore_too_big
+                        ArchiveError.STORAGE -> R.string.restore_storage
+                    },
+                )
+            } catch (e: Exception) {
+                message = UiMessage(R.string.restore_failed)
+            } finally {
+                normalized.fill('\u0000')
+                busy = false
+            }
+        }
+    }
+
+    /** La restauration préparée est activée : sa clé n'a plus à rester en mémoire. */
+    private fun restoreActivated() {
+        c.pendingRestoreKey?.fill(0)
+        c.pendingRestoreKey = null
+        restoredCount = null
     }
 
     fun createPassphrase(passphrase: String, confirmation: String) {
@@ -143,7 +236,7 @@ class AccessViewModel(app: Application) : AndroidViewModel(app) {
             else -> gateCall(onError = Screen.Intro) {
                 c.calibrateKdf()
                 c.createDeviceKeys()
-                val pending = c.gate.beginSetup(chars)
+                val pending = c.gate.beginSetup(chars, c.pendingRestoreKey)
                 chars.fill('\u0000')
                 if (SecondFactor.AUTOMATIC) {
                     // Démo : la seconde étape est faite automatiquement (voir SecondFactor).
@@ -151,6 +244,7 @@ class AccessViewModel(app: Application) : AndroidViewModel(app) {
                     val confirmed = SecondFactor.codes(c.appContext).any { c.gate.confirmSetup(pending, it) == null }
                     message = null
                     if (confirmed) {
+                        restoreActivated()
                         c.timers.onUnlocked(c.clock.elapsedMillis())
                         screen = Screen.Home
                     } else {
@@ -173,6 +267,7 @@ class AccessViewModel(app: Application) : AndroidViewModel(app) {
             when (c.gate.confirmSetup(pending, code)) {
                 null -> {
                     enrollment = null
+                    restoreActivated()
                     c.timers.onUnlocked(c.clock.elapsedMillis())
                     message = null
                     screen = Screen.Home
@@ -187,6 +282,7 @@ class AccessViewModel(app: Application) : AndroidViewModel(app) {
         enrollment?.discard()
         enrollment = null
         message = null
+        discardRestore()
         screen = Screen.Intro
     }
 

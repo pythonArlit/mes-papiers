@@ -115,6 +115,16 @@ class Vault(private val db: VaultDb, private val gate: SessionGate) {
         }
     }
 
+    /** Restauration : écrit une fiche sous une clé de données fournie, coffre pas encore configuré. */
+    fun restoreRecord(dataKey: ByteArray, record: Record) {
+        val key = RecordVault.key(dataKey)
+        try {
+            db.records().put(RecordRow(record.id, RecordVault.seal(key, record)))
+        } finally {
+            key.wipe()
+        }
+    }
+
     fun delete(id: String) {
         if (!gate.isOpen) throw app.mespapiers.core.access.VaultLockedException()
         db.records().delete(id)

@@ -109,6 +109,43 @@ class AttachmentStore(context: Context, private val db: VaultDb, private val gat
         AttachmentVault.decrypting(key, meta.id, file(meta.id).inputStream().buffered()).use { it.readBytes() }
     }
 
+    /** Contenu déchiffré, en flux (export). L'appelant ferme le flux. */
+    fun open(meta: AttachmentMeta): InputStream = withKey { key ->
+        AttachmentVault.decrypting(key, meta.id, file(meta.id).inputStream().buffered())
+    }
+
+    /**
+     * Restauration : chiffre [content] sous une clé de données fournie, coffre pas encore
+     * configuré. Le fichier est nommé d'après meta.id, que l'appelant vient de tirer au
+     * hasard : aucun nom de l'archive n'est utilisé. Lève ImportException si le contenu
+     * n'est pas du format annoncé.
+     */
+    fun restore(dataKey: ByteArray, meta: AttachmentMeta, content: InputStream) {
+        dir.mkdirs()
+        val key = AttachmentVault.key(dataKey)
+        val tmp = File(dir, "${meta.id}.tmp")
+        try {
+            val imported = AttachmentVault.importStream(key, meta.id, content, SyncingStream(FileOutputStream(tmp)), Limits.MAX_FILE_BYTES)
+            if (imported.format != meta.format || imported.plainSize != meta.plainSize) {
+                throw app.mespapiers.core.model.ImportException(app.mespapiers.core.model.ImportException.Reason.UNSUPPORTED_FORMAT)
+            }
+            if (!tmp.renameTo(file(meta.id))) throw IOException("Renommage impossible")
+            db.attachments().put(AttachmentRow(meta.id, AttachmentVault.sealMeta(key, meta)))
+        } catch (e: Exception) {
+            tmp.delete()
+            throw e
+        } finally {
+            key.wipe()
+        }
+    }
+
+    /** Supprime toutes les pièces (installation remise à vide). */
+    fun wipe() {
+        dir.deleteRecursively()
+    }
+
+    val usableSpace: Long get() = dir.apply { mkdirs() }.usableSpace
+
     fun delete(meta: AttachmentMeta) {
         if (!gate.isOpen) throw app.mespapiers.core.access.VaultLockedException()
         db.attachments().delete(meta.id)

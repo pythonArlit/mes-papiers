@@ -328,3 +328,36 @@ object ArchiveReader {
         override fun close() = Unit
     }
 }
+
+/**
+ * Trace de la phrase de récupération, gardée CHIFFRÉE dans le coffre (sel + empreinte), pour
+ * vérifier à chaque export que la phrase ressaisie est bien celle d'origine.
+ */
+object RecoveryRecord {
+    private val CTX = CryptoContext.of("mp", "recovery-record", "v1")
+
+    private fun key(dataKey: ByteArray) = Hkdf.derive(dataKey, null, "mp/settings/v1")
+
+    fun seal(dataKey: ByteArray, normalizedPhrase: CharArray): ByteArray {
+        val salt = PassphraseKdf.newSalt()
+        val key = key(dataKey)
+        try {
+            return app.mespapiers.core.crypto.Aead.seal(key, salt + RecoveryVerifier.compute(normalizedPhrase, salt), CTX)
+        } finally {
+            key.wipe()
+        }
+    }
+
+    /** Faux si la phrase est différente ou si l'enregistrement est illisible. */
+    fun matches(dataKey: ByteArray, blob: ByteArray, normalizedPhrase: CharArray): Boolean {
+        val key = key(dataKey)
+        return try {
+            val plain = app.mespapiers.core.crypto.Aead.open(key, blob, CTX)
+            RecoveryVerifier.matches(normalizedPhrase, plain.copyOfRange(0, 16), plain.copyOfRange(16, plain.size))
+        } catch (e: java.security.GeneralSecurityException) {
+            false
+        } finally {
+            key.wipe()
+        }
+    }
+}

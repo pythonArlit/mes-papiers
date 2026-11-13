@@ -159,12 +159,17 @@ class SessionGate(
 
     // ---------------------------------------------------------------- configuration
 
-    fun beginSetup(passphrase: CharArray): PendingEnrollment = synchronized(mutex) {
+    /**
+     * @param dataKey clé de données déjà choisie (restauration d'une archive : le contenu a été
+     *   préparé sous cette clé avant que le coffre n'existe). Sinon une clé neuve est tirée.
+     */
+    fun beginSetup(passphrase: CharArray, dataKey: ByteArray? = null): PendingEnrollment = synchronized(mutex) {
         check(store.load() == null) { "Coffre déjà configuré" }
         require(PassphrasePolicy.isLongEnough(passphrase)) { "Phrase trop courte" }
         val params = newKdfParams()
         val keks = deriveKeks(passphrase, params)
-        val dk = Aead.newKey()
+        require(dataKey == null || dataKey.size == Aead.KEY_BYTES) { "Clé de données invalide" }
+        val dk = dataKey?.copyOf() ?: Aead.newKey()
         val seed = Totp.newSeed()
         try {
             val record = GateRecord(

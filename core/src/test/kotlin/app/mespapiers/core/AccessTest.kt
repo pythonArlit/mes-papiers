@@ -206,6 +206,27 @@ class AccessTest {
     }
 
     @Test
+    fun configuration_avec_une_cle_de_donnees_fournie_par_une_restauration() {
+        val r = Rig()
+        val restored = ByteArray(32) { (it * 7).toByte() }
+        val e = r.gate.beginSetup(r.pass.toCharArray(), restored)
+        assertNull("rien n'est activé avant le premier code", r.store.record)
+        r.seed = Base32.decode(e.manualKey())
+        assertNull(r.gate.confirmSetup(e, r.codeNow()))
+        assertEquals(restored.toHex(), r.dataKeyHex())
+        r.gate.lock()
+        r.clock.advance(60_000)
+        r.gate.submitPassphrase(r.pass.toCharArray())
+        r.gate.submitTotp(r.codeNow())
+        assertEquals(restored.toHex(), r.dataKeyHex())
+        try {
+            Rig().gate.beginSetup(r.pass.toCharArray(), ByteArray(5))
+            fail("clé de taille invalide acceptée")
+        } catch (ex: IllegalArgumentException) {
+        }
+    }
+
+    @Test
     fun phrase_trop_courte_refusee() {
         val r = Rig()
         try {

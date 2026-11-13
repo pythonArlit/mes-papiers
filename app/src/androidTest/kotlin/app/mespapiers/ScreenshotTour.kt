@@ -247,5 +247,13 @@ class ScreenshotTour {
         tap(By.text("Saisir à la main, sans scanner"))
         waitFor(By.text("Quel type de document ?"))
         shot("categories")
+        device.pressBack()
+        settle()
+        tap(By.desc("Sauvegarde"))
+        waitFor(By.text("Créer ma phrase de récupération"))
+        shot("sauvegarde")
+        tap(By.text("Créer ma phrase de récupération"))
+        waitFor(By.text("Je l'ai notée").let { By.textContains("ai notée") })
+        shot("phrase-de-recuperation")
     }
 }

@@ -280,6 +280,17 @@ class ArchiveTest {
         assertFalse(String(v, Charsets.ISO_8859_1).contains(String(phrase)))
     }
 
+    @Test
+    fun trace_chiffree_de_la_phrase_de_recuperation() {
+        val dk = app.mespapiers.core.crypto.Aead.newKey()
+        val blob = app.mespapiers.core.archive.RecoveryRecord.seal(dk, phrase)
+        assertTrue(app.mespapiers.core.archive.RecoveryRecord.matches(dk, blob, phrase))
+        assertFalse(app.mespapiers.core.archive.RecoveryRecord.matches(dk, blob, RecoveryPhrase.normalize(RecoveryPhrase.generate())!!))
+        assertFalse("autre coffre", app.mespapiers.core.archive.RecoveryRecord.matches(app.mespapiers.core.crypto.Aead.newKey(), blob, phrase))
+        assertFalse(app.mespapiers.core.archive.RecoveryRecord.matches(dk, ByteArray(10), phrase))
+        assertFalse(String(blob, Charsets.ISO_8859_1).contains(String(phrase)))
+    }
+
     /** Flux de zéros de longueur donnée, pour tester les limites sans allouer 20 Mo. */
     private class ZeroStream(private var remaining: Long) : InputStream() {
         override fun read(): Int = if (remaining-- > 0) 0 else -1

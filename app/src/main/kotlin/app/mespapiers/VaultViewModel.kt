@@ -4,7 +4,11 @@ import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.provider.DocumentsContract
 import android.provider.OpenableColumns
+import app.mespapiers.core.docs.ExportReminder
+import app.mespapiers.core.docs.RecoveryPhrase
+import app.mespapiers.data.ExportCancelled
 import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -60,7 +64,13 @@ sealed interface VaultScreen {
     data object PickCategory : VaultScreen
     data object Edit : VaultScreen
     data class Viewer(val attachmentId: String) : VaultScreen
+    data object Backup : VaultScreen
 }
+
+enum class BackupStep { OVERVIEW, SHOW_PHRASE, CONFIRM_PHRASE }
+
+/** Message de l'écran de sauvegarde. */
+class BackupNote(val text: String, val isError: Boolean)
 
 /** Ce que la visionneuse affiche. Les images déchiffrées ne vivent qu'en mémoire. */
 sealed interface ViewerState {
@@ -180,6 +190,12 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
     /** Retour à l'état initial, appelé dès que la session n'est plus ouverte. */
     fun reset() {
         screen = VaultScreen.Home
+        backupStep = BackupStep.OVERVIEW
+        backupNote = null
+        newPhrase = null
+        exportCancelled = true
+        exportPhrase?.fill('\u0000')
+        exportPhrase = null
         query = ""
         category = null
         draft = null
@@ -202,6 +218,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             orphans.forEach { c.attachments.delete(it) }
             state.set(loaded.records, loaded.unreadable, ::categoryLabel)
             state.attachments = kept
+            refreshBackupInfo()
         }
     }
 
@@ -227,6 +244,17 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             is VaultScreen.Viewer -> {
                 closeViewer()
                 screen = viewerReturn
+            }
+            VaultScreen.Backup -> {
+                if (exportProgress != null) return
+                backupNote = null
+                if (backupStep != BackupStep.OVERVIEW) {
+                    // La phrase affichée mais non confirmée est abandonnée.
+                    newPhrase = null
+                    backupStep = BackupStep.OVERVIEW
+                } else {
+                    screen = VaultScreen.Home
+                }
             }
             VaultScreen.Edit -> cancelDraft()
         }
@@ -688,6 +716,130 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                 scanning = false
             }
         }
+    }
+
+    // ------------------------------------------------------------ sauvegarde
+
+    var backupStep by mutableStateOf(BackupStep.OVERVIEW)
+        private set
+    var hasRecoveryPhrase by mutableStateOf(false)
+        private set
+    var lastExportMs by mutableStateOf<Long?>(null)
+        private set
+
+    /** Phrase de récupération tout juste générée, affichée une seule fois ; jamais écrite sur le disque. */
+    var newPhrase by mutableStateOf<String?>(null)
+        private set
+
+    /** Octets de pièces jointes exportés pendant un export en cours, null sinon. */
+    var exportProgress by mutableStateOf<Long?>(null)
+        private set
+    var backupNote by mutableStateOf<BackupNote?>(null)
+        private set
+    private var exportPhrase: CharArray? = null
+
+    @Volatile
+    private var exportCancelled = false
+
+    private fun refreshBackupInfo() {
+        hasRecoveryPhrase = c.backup.hasRecoveryPhrase
+        lastExportMs = c.backup.lastExportMs()
+    }
+
+    fun exportState(): ExportReminder.State = ExportReminder.state(lastExportMs, c.clock.wallMillis())
+
+    fun lastExportText(): String? = lastExportMs?.let { DateText.format(Deadlines.today(it, ZoneId.systemDefault())) }
+
+    fun exportFileName(): String = "mes-papiers-" + today() + ".mparch"
+
+    fun openBackup() {
+        error = null
+        backupNote = null
+        backupStep = BackupStep.OVERVIEW
+        refreshBackupInfo()
+        screen = VaultScreen.Backup
+    }
+
+    fun generatePhrase() {
+        newPhrase = String(RecoveryPhrase.generate())
+        backupNote = null
+        backupStep = BackupStep.SHOW_PHRASE
+    }
+
+    fun phraseNoted() {
+        backupNote = null
+        backupStep = BackupStep.CONFIRM_PHRASE
+    }
+
+    /** La phrase n'est retenue que si l'utilisateur la ressaisit correctement. */
+    fun confirmPhrase(typed: String) {
+        val entered = RecoveryPhrase.normalize(typed.toCharArray())
+        val expected = newPhrase?.let { RecoveryPhrase.normalize(it.toCharArray()) }
+        if (entered == null || expected == null || !entered.contentEquals(expected)) {
+            backupNote = BackupNote(string(R.string.backup_phrase_mismatch), true)
+            return
+        }
+        io {
+            c.backup.saveRecoveryPhrase(entered)
+            entered.fill('\u0000')
+            newPhrase = null
+            hasRecoveryPhrase = true
+            backupStep = BackupStep.OVERVIEW
+            backupNote = BackupNote(string(R.string.backup_phrase_saved), false)
+        }
+    }
+
+    /** Vérifie la phrase ressaisie ; vrai si l'export peut continuer par le choix de l'emplacement. */
+    fun prepareExport(typed: String): Boolean {
+        val entered = RecoveryPhrase.normalize(typed.toCharArray())
+        val ok = entered != null && try {
+            c.backup.checkRecoveryPhrase(entered)
+        } catch (e: Exception) {
+            false
+        }
+        if (entered == null || !ok) {
+            backupNote = BackupNote(string(R.string.backup_phrase_wrong), true)
+            return false
+        }
+        exportPhrase = entered
+        backupNote = null
+        beforeExternalActivity()
+        return true
+    }
+
+    fun exportTo(uri: Uri?) {
+        val phrase = exportPhrase
+        exportPhrase = null
+        if (uri == null || phrase == null) {
+            phrase?.fill('\u0000')
+            return
+        }
+        exportCancelled = false
+        exportProgress = 0
+        val resolver = c.appContext.contentResolver
+        viewModelScope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    val out = resolver.openOutputStream(uri, "w") ?: throw IOException("Emplacement inaccessible")
+                    c.backup.export(out.buffered(), phrase, { exportCancelled }) { exportProgress = it }
+                }
+                lastExportMs = c.backup.lastExportMs()
+                val text = getApplication<Application>().getString(R.string.backup_done, result.records, result.attachments) +
+                    if (result.unreadable > 0) " " + getApplication<Application>().getString(R.string.backup_done_unreadable, result.unreadable) else ""
+                backupNote = BackupNote(text, result.unreadable > 0)
+            } catch (e: Exception) {
+                // Pas d'archive partielle laissée derrière soi.
+                withContext(Dispatchers.IO) { runCatching { DocumentsContract.deleteDocument(resolver, uri) } }
+                backupNote = if (e is ExportCancelled) BackupNote(string(R.string.backup_cancelled), false) else BackupNote(string(R.string.backup_failed), true)
+            } finally {
+                phrase.fill('\u0000')
+                exportProgress = null
+            }
+        }
+    }
+
+    fun cancelExport() {
+        exportCancelled = true
     }
 
     // ------------------------------------------------------------ visionneuse

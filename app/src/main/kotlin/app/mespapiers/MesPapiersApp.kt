@@ -16,6 +16,7 @@ import app.mespapiers.core.docs.LockTimers
 import app.mespapiers.platform.AndroidClock
 import app.mespapiers.platform.KeystoreDeviceKey
 import app.mespapiers.data.AttachmentStore
+import app.mespapiers.data.BackupManager
 import app.mespapiers.data.Vault
 import app.mespapiers.data.VaultDb
 import app.mespapiers.data.VaultState
@@ -41,6 +42,18 @@ class AppContainer(context: Context) {
     val vault = Vault(db, gate)
     val attachments = AttachmentStore(appContext, db, gate)
     val vaultState = VaultState()
+    val backup = BackupManager(appContext, db, gate, vault, attachments, clock)
+
+    /** Clé de données d'une restauration préparée, en mémoire jusqu'à la configuration du coffre. */
+    @Volatile
+    var pendingRestoreKey: ByteArray? = null
+
+    /** Abandonne une restauration préparée : l'installation redevient vide. À appeler hors du fil principal. */
+    fun discardRestore() {
+        pendingRestoreKey?.fill(0)
+        pendingRestoreKey = null
+        if (!gate.isConfigured) backup.wipeAll()
+    }
 
     /** Verrouille la session et vide tout ce qui a été déchiffré en mémoire. */
     fun lockNow() {
@@ -93,7 +106,11 @@ class MesPapiersApp : Application() {
         super.onCreate()
         container = AppContainer(this)
         // Nettoyage systématique au démarrage : fichiers de travail en clair et orphelins.
-        Thread { runCatching { container.attachments.cleanup() } }.start()
+        Thread {
+            // Une restauration préparée mais jamais activée est effacée : l'installation reste vide.
+            runCatching { container.backup.cleanupIfUnconfigured() }
+            runCatching { container.attachments.cleanup() }
+        }.start()
         // Extinction de l'écran : verrouillage immédiat, étape intermédiaire comprise.
         val screenOff = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
