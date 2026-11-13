@@ -89,7 +89,8 @@ class ScreenshotTour {
                 }
                 scrollDown()
             } catch (e: StaleObjectException) {
-                SystemClock.sleep(300)
+                // Élément connu mais hors de l'écran (ou écran en cours de mise à jour) : on fait défiler.
+                scrollDown()
             }
         }
         throw AssertionError("introuvable : $selector ; à l'écran : " + visibleTexts())

@@ -2,7 +2,7 @@
 
 > **État au 11 novembre 2026 : ne pas utiliser avec des documents réels.**
 >
-> - L'application se compile et s'installe, mais elle est **incomplète** : pas de partage, pas de rappels, **pas de sauvegarde**. Sans sauvegarde, perdre le téléphone ou un facteur d'accès, c'est tout perdre.
+> - L'application se compile et s'installe, mais elle est **incomplète** : pas de partage, pas de rappels d'échéance, pas d'écran de paramètres. La sauvegarde existe mais n'a pas encore été éprouvée d'un téléphone réel à un autre.
 > - La variante `demo` ne demande **pas** le code de l'application d'authentification (raccourci de démonstration) : elle n'a que la protection de la phrase secrète.
 > - L'interface n'a été vérifiée par aucun test ni sur aucun téléphone réel.
 > - Le scanner de documents (détection des bords, coins ajustables) dépend des services Google Play et n'a jamais été exécuté : il compile, sans plus.
@@ -21,8 +21,8 @@ Application Android individuelle et hors connexion pour conserver et retrouver p
 | J1 Accès et stockage chiffré | Fait et testé | Fait : configuration, connexion en deux étapes, verrouillage ; testé sur émulateur avec le vrai Keystore. Manquent les écrans de paramètres |
 | J2 Fiches et pièces jointes | Fait et testé | Fait : fiches (Room chiffré, accueil, liste, détail, édition) et pièces jointes (import, photo, visionneuse image et PDF). Scan avec lecture automatique et fiche pré-remplie à relire ; aperçus des documents |
 | J3 Partage et échéances | Calcul fait et testé | État des échéances affiché. Partage et rappels à faire |
-| J4 Sauvegarde et restauration | Format fait et testé | À faire |
-| J5 Recette et revue MASVS | 104 tests JVM, contrôle par mutation | 23 tests instrumentés ; recette manuelle à faire |
+| J4 Sauvegarde et restauration | Format fait et testé | Fait : phrase de récupération, export, restauration dans une installation vide, rappel ; testé sur émulateur, pas encore d'un téléphone à l'autre |
+| J5 Recette et revue MASVS | 114 tests JVM, contrôle par mutation | 34 tests instrumentés, visite guidée avec captures ; recette manuelle à faire |
 
 Des captures d'écran de la démo (données fictives) sont publiées par la CI sur la branche `captures`.
 

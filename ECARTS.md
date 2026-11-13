@@ -11,7 +11,7 @@ Tout ce qui est incomplet, non vérifié ou différent du cahier des charges. **
 | J1 Accès | Configuration, connexion en deux étapes, QR d'enrôlement, délai progressif, verrouillage (écran éteint, arrière-plan, inactivité), avertissement sans verrouillage d'écran | Paramètres : changement de phrase et nouvel enrôlement TOTP (la logique existe dans le noyau, pas l'écran) ; réglage des durées de verrouillage |
 | J2 Fiches et pièces | Fiches : ajout, modification, favori, duplication (avec ou sans pièces), suppression confirmée, champs personnalisés, masquage, accueil, liste, recherche. Pièces jointes : import par le sélecteur système, photo par l'appareil photo du système, limites, format vérifié par signature, annulation, stockage chiffré, visionneuse image et PDF, suppression indépendante, nettoyage au démarrage | Sélecteur de date (saisie au format JJ/MM/AAAA) |
 | J3 Partage et échéances | État des échéances affiché | Partage, presse-papiers, rappels et notifications |
-| J4 Sauvegarde | Format et lecture vérifiée dans le noyau | Écrans d'export et de restauration, phrase de récupération, rappel d'export |
+| J4 Sauvegarde | Phrase de récupération (générée, affichée une fois, confirmée par ressaisie), export d'une archive chiffrée vers un emplacement choisi, avec progression et annulation, restauration dans une installation vide avec bascule atomique, rappel sur l'accueil quand la sauvegarde manque ou date de plus de 30 jours | Réglages de rappel dans l'archive (il n'y a pas encore de rappels) ; le rappel n'est pas affiché sur l'écran de connexion |
 | J5 Recette | Tests JVM et instrumentés automatiques | Recette manuelle, accessibilité, captures d'écran |
 
 **E-08 — Interface vue sur émulateur seulement.**
@@ -63,6 +63,9 @@ Ajoutée à la demande du commanditaire (`DECISIONS.md`, D-27), contre l'exclusi
 **E-16 — Scanner de documents : jamais exécuté, et hors de l'esprit « tout hors connexion ».**
 Voir `DECISIONS.md`, D-32. Le scanner de Google est intégré et compile, mais **aucun test ne l'exerce** : il dépend des services Google Play et d'une interface que la CI ne peut pas piloter. Son comportement réel (lancement, téléchargement du module, retour de l'image, effacement de la copie temporaire, repli) n'a été vérifié par personne. Dépendances nouvelles : services Google Play, 1,7 Go de RAM, connexion du téléphone à la première utilisation. L'emplacement exact des fichiers temporaires du scanner est supposé (cache privé, dossier commençant par `mlkit_docscan`) : à contrôler sur appareil. Sans scanner, la photo n'est pas recadrée.
 
+**E-17 — Sauvegarde et restauration : ce qui n'est pas vérifié.**
+La logique est testée sur émulateur avec le vrai Keystore (`BackupTest`). Ne sont pas vérifiés : les écrans eux-mêmes par un parcours complet (choix de l'emplacement et de l'archive par le sélecteur du système), l'écriture vers un fournisseur de documents distant ou une carte SD, la suppression de l'archive partielle après un échec (au mieux, selon le fournisseur), et une restauration réelle d'un téléphone vers un autre. Les aperçus ne sont pas dans l'archive : ils sont refabriqués à la première consultation. Créer une nouvelle phrase de récupération ne rechiffre pas les anciennes archives, qui restent ouvrables avec l'ancienne phrase seulement. Pendant une restauration, la clé de données neuve reste en mémoire jusqu'à la fin de la configuration de l'accès.
+
 ## Limites connues
 
 - **Délai progressif après redémarrage** : le délai en cours repart entier (`DECISIONS.md`, D-07).
@@ -80,7 +83,7 @@ Voir `DECISIONS.md`, D-32. Le scanner de Google est intégré et compile, mais *
 
 ## Avant toute utilisation avec des documents réels
 
-1. Terminer E-02 (partage, rappels, sauvegarde) : sans export, la perte du téléphone ou d'un facteur est définitive.
+1. Terminer E-02 (partage, rappels, paramètres) et dérouler une vraie restauration d'un téléphone vers un autre (E-17).
 2. Lever E-03 (Tink ou relecture).
 3. Vérifier l'interface sur appareil (E-08) et mesurer Argon2id (E-05).
 4. Dérouler la recette manuelle : absence de sauvegarde et de transfert, notifications, restauration sur un second téléphone.

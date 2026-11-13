@@ -6,8 +6,8 @@ Dernière exécution : 11 novembre 2026, par la CI GitHub Actions (`.github/work
 
 | Niveau | Commande | Environnement | Résultat |
 | --- | --- | --- | --- |
-| Unitaire JVM, module `:core` | `./gradlew :core:test` | Ubuntu 26.04, JDK 17, Gradle 9.6.0, Kotlin 2.4.10 | **112 tests réussis** : AccessTest 27, ArchiveTest 13, AttachmentTest 6, CryptoTest 15, DocsTest 21, ExtractionTest 23, StoreTest 7 |
-| Instrumenté, module `:app` | `./gradlew :app:connectedDemoDebugAndroidTest` | Émulateur Android 14 (API 34), x86-64 | **27 tests réussis** : KeystoreGateTest 7, VaultDbTest 4, AttachmentStoreTest 8, TextReaderTest 8 |
+| Unitaire JVM, module `:core` | `./gradlew :core:test` | Ubuntu 26.04, JDK 17, Gradle 9.6.0, Kotlin 2.4.10 | **114 tests réussis** : AccessTest 28, ArchiveTest 14, AttachmentTest 6, CryptoTest 15, DocsTest 21, ExtractionTest 23, StoreTest 7 |
+| Instrumenté, module `:app` | `./gradlew :app:connectedDemoDebugAndroidTest` | Émulateur Android 14 (API 34), x86-64 | **34 tests réussis** : KeystoreGateTest 7, VaultDbTest 4, AttachmentStoreTest 8, TextReaderTest 8, BackupTest 7 |
 | Lint | `./gradlew :app:lintProdRelease` | Idem | Réussi, sans erreur |
 | Compilation | `./gradlew :app:assembleDemoDebug :app:assembleProdRelease` | Idem | Réussie |
 | Contrôle de l'APK `prod` | `tools/check-apk.sh` | aapt2 des build-tools | Réussi |
@@ -59,7 +59,8 @@ Statuts : **exécuté et réussi**, **exécuté et en échec**, **non exécuté*
 | **Rappels** | Unitaire JVM | **Exécuté et réussi** pour le calcul | `DocsTest` : `etat_des_echeances`, `rappels_*` | JVM 17 |
 | | Notifications coffre verrouillé, replanification | **Non exécuté** | Non écrit | — |
 | **Restauration** | Unitaire JVM | **Exécuté et réussi** pour le format | `ArchiveTest` (13 tests) | JVM 17 |
-| | Sur un second téléphone, bascule atomique | **Non exécuté** | Non écrit | — |
+| | Instrumenté | **Exécuté et réussi** | `BackupTest` : `export_puis_restauration_sur_une_autre_installation` (autres clés Keystore, nouvel enrôlement, identifiants renumérotés), `mauvaise_phrase_archive_modifiee_ou_tronquee_installation_toujours_vide`, `restauration_preparee_mais_jamais_activee_effacee_au_demarrage`, `restauration_refusee_dans_une_installation_deja_configuree`, `export_annule`, `coffre_verrouille_pas_d_export`, `phrase_de_recuperation_verifiee_sans_etre_stockee` | Émulateur, Android 14 |
+| | D'un téléphone réel vers un autre, par l'interface | **Non exécuté** | À faire à la main | — |
 | **Perte d'un facteur** | Unitaire JVM | **Exécuté et réussi** | `AccessTest.sans_phrase_ou_sans_totp_aucun_acces`, `cle_keystore_perdue_coffre_illisible` | JVM 17 |
 | | Instrumenté | **Exécuté et réussi** | `KeystoreGateTest.cle_keystore_perdue_signalee_sans_compter_d_echec`, `cle_supprimee_coffre_illisible_sans_recreation_silencieuse` | Émulateur, Android 14 |
 | **Stockage** | Unitaire JVM | **Exécuté et réussi** | `StoreTest.aucun_secret_en_clair_dans_les_fichiers_d_etat`, `CryptoTest.flux_ne_laisse_pas_le_clair_dans_le_chiffre`, `ArchiveTest.archive_ne_contient_rien_en_clair` | JVM 17 |
