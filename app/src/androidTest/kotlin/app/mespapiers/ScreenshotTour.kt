@@ -11,6 +11,9 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.BySelector
+import androidx.test.uiautomator.Configurator
+import androidx.test.uiautomator.UiObjectNotFoundException
+import androidx.test.uiautomator.UiSelector
 import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
@@ -94,6 +97,31 @@ class ScreenshotTour {
             }
         }
         throw AssertionError("introuvable : $selector ; à l'écran : " + visibleTexts())
+    }
+
+    /**
+     * Variante par l'ancienne interface d'UiAutomator, qui réinterroge l'écran à chaque appel :
+     * elle sert pour les éléments placés sous une liste dont les aperçus se chargent encore.
+     */
+    private fun tapTextContaining(part: String, timeout: Long = 40_000) {
+        val end = SystemClock.uptimeMillis() + timeout
+        while (SystemClock.uptimeMillis() < end) {
+            try {
+                val o = device.findObject(UiSelector().textContains(part))
+                if (o.exists()) {
+                    val b = o.visibleBounds
+                    if (b.height() > 20 && b.centerY() in 120 until device.displayHeight - 120) {
+                        o.click()
+                        settle()
+                        return
+                    }
+                }
+            } catch (e: UiObjectNotFoundException) {
+                // Disparu entre deux lectures : on réessaie.
+            }
+            scrollDown()
+        }
+        throw AssertionError("introuvable : texte contenant « $part »")
     }
 
     private fun type(vararg values: String) {
@@ -192,6 +220,7 @@ class ScreenshotTour {
     @Test
     fun visite() {
         assumeTrue("visite guidée non demandée", InstrumentationRegistry.getArguments().getString("tour") == "1")
+        Configurator.getInstance().waitForIdleTimeout = 2_500
         device.executeShellCommand("mkdir -p /sdcard/Download/mespapiers")
         val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)!!
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
@@ -218,7 +247,7 @@ class ScreenshotTour {
         scrollDown()
         shot("accueil-suite")
 
-        tap(By.textContains("Voir et rechercher"))
+        tapTextContaining("Voir et rechercher")
         waitFor(By.text("Tous les documents"))
         shot("liste")
         tap(By.text("Carte nationale d'identité"))
